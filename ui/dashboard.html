@@ -582,6 +582,53 @@
           </div>
         </div>
       </div>
+
+      <!-- AgentDB RL Stampede Governor Card -->
+      <div class="card mb-16">
+        <div class="card-header">
+          <h3>AgentDB Reinforcement Learning (Q-Learning) Stampede Governor</h3>
+          <div class="btn-group">
+            <button id="gov-autopilot-btn" class="btn btn-primary btn-sm" onclick="toggleGovernorAutoPilot()">Auto-Pilot: ON</button>
+            <button class="btn btn-ghost btn-sm" onclick="stepGovernorSim()">Step RL Feedback</button>
+            <button class="btn btn-ghost btn-sm" onclick="resetGovernorState()">Reset Q-Table</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="grid-4 mb-16">
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">ADAPTIVE MAX RPS</div>
+              <div id="gov-val-rps" style="font-weight:600; font-size:18px; color:var(--accent); margin-top:4px;">6.0 RPS</div>
+            </div>
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">DYNAMIC BURST CEILING</div>
+              <div id="gov-val-burst" style="font-weight:600; font-size:18px; margin-top:4px;">3 Tokens</div>
+            </div>
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">EXPLORATION RATE (ε)</div>
+              <div id="gov-val-eps" style="font-weight:600; font-size:18px; color:var(--warning); margin-top:4px;">0.20</div>
+            </div>
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">CUMULATIVE REWARD</div>
+              <div id="gov-val-reward" style="font-weight:600; font-size:18px; margin-top:4px;">0.00</div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px; font-family:monospace; font-size:12px;">
+            <div>
+              <span class="text-muted">Last Policy Action:</span>
+              <span id="gov-val-action" class="badge badge-ok" style="margin-left:6px;">MAINTAIN</span>
+            </div>
+            <div>
+              <span class="text-muted">Q-States Explored:</span>
+              <span id="gov-val-states" style="font-weight:600; margin-left:6px;">0</span>
+            </div>
+            <div>
+              <span class="text-muted">Total Steps:</span>
+              <span id="gov-val-steps" style="font-weight:600; margin-left:6px;">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ── Page: Git Branch Manager ───────────────────────────── -->

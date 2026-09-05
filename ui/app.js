@@ -939,6 +939,86 @@ async function triggerSimOverlap() {
 async function stepSimRecovery() {
   await API.post('/api/sim/step', {});
   await pollSimSnapshot();
+  await loadGovernorState();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// AgentDB RL Stampede Governor Controllers (Phase 27)
+// ─────────────────────────────────────────────────────────────────────────
+async function loadGovernorState() {
+  try {
+    const res = await API.get('/api/governor/state');
+    if (!res.governor) return;
+    const g = res.governor;
+    const l = res.limiter;
+
+    const rpsEl = document.getElementById('gov-val-rps');
+    const burstEl = document.getElementById('gov-val-burst');
+    const epsEl = document.getElementById('gov-val-eps');
+    const rewardEl = document.getElementById('gov-val-reward');
+    const statesEl = document.getElementById('gov-val-states');
+    const stepsEl = document.getElementById('gov-val-steps');
+    const btnAuto = document.getElementById('gov-autopilot-btn');
+
+    if (rpsEl) rpsEl.textContent = `${g.current_rps.toFixed(1)} RPS`;
+    if (burstEl) burstEl.textContent = `${g.current_burst} Tokens`;
+    if (epsEl) epsEl.textContent = g.epsilon.toFixed(2);
+    if (rewardEl) {
+      rewardEl.textContent = g.cumulative_reward.toFixed(2);
+      rewardEl.style.color = g.cumulative_reward >= 0 ? 'var(--fresh)' : 'var(--danger)';
+    }
+    if (statesEl) statesEl.textContent = g.q_states_explored;
+    if (stepsEl) stepsEl.textContent = g.total_steps;
+    if (btnAuto) {
+      btnAuto.textContent = g.auto_pilot ? 'Auto-Pilot: ON' : 'Auto-Pilot: OFF';
+      btnAuto.className = g.auto_pilot ? 'btn btn-primary btn-sm' : 'btn btn-ghost btn-sm';
+    }
+  } catch (e) {
+    console.error('Error loading governor state:', e);
+  }
+}
+
+async function stepGovernorSim() {
+  try {
+    const res = await API.post('/api/governor/step', {
+      origin_latency_ms: 18.5,
+      packet_drop_rate: 0.35,
+      stale_key_count: 5,
+      total_keys: 10,
+      origin_rejections: 0,
+      repaired_keys: 3,
+      dedup_savings: 4
+    });
+
+    const actEl = document.getElementById('gov-val-action');
+    if (actEl && res.step_result) {
+      actEl.textContent = res.step_result.action;
+      actEl.className = res.step_result.action.includes('BOOST') ? 'badge badge-ok' : res.step_result.action.includes('THROTTLE') ? 'badge badge-quarantined' : 'badge badge-stale';
+    }
+    await loadGovernorState();
+  } catch (e) {
+    alert(`Governor step failed: ${e.message}`);
+  }
+}
+
+async function toggleGovernorAutoPilot() {
+  try {
+    const curr = document.getElementById('gov-autopilot-btn')?.textContent.includes('ON');
+    await API.post('/api/governor/toggle-autopilot', { enabled: !curr });
+    await loadGovernorState();
+  } catch (e) {
+    alert(`Toggle failed: ${e.message}`);
+  }
+}
+
+async function resetGovernorState() {
+  try {
+    await API.post('/api/governor/reset', {});
+    alert("RL Governor Q-Table and rate limiters reset to baseline!");
+    await loadGovernorState();
+  } catch (e) {
+    alert(`Reset failed: ${e.message}`);
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -1572,7 +1652,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (page === 'page-entities')  { if (state.selectedNodeId) loadEntities(state.selectedNodeId); }
       if (page === 'page-commits')   loadCommitLog();
       if (page === 'page-security')  loadSecurityFeed();
-      if (page === 'page-simulator') pollSimSnapshot();
+      if (page === 'page-simulator') { pollSimSnapshot(); loadGovernorState(); }
       if (page === 'page-branches')  loadNodeBranches();
       if (page === 'page-audit')     loadAuditTrail();
       if (page === 'page-directory') loadDirectoryCatalog();

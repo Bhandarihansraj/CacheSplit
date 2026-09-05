@@ -81,6 +81,8 @@ CacheSplit is a distributed caching prototype and simulation engine built with *
 | [`semantic_invalidation.py`](file:///D:/myonsite/CacheSplit/core/semantic_invalidation.py) | Semantic neighborhood invalidator broadcasting cluster invalidations based on distance radius. |
 | [`audit_embedder.py`](file:///D:/myonsite/CacheSplit/core/audit_embedder.py) | Deterministic dense feature & text embedder projecting audit events into 32-D vector space. |
 | [`audit_vector_index.py`](file:///D:/myonsite/CacheSplit/core/audit_vector_index.py) | Hybrid vector index combining Cosine similarity with relational audit filters (`is_bad_data`, `min_risk`). |
+| [`rl_stampede_governor.py`](file:///D:/myonsite/CacheSplit/core/rl_stampede_governor.py) | AgentDB Q-learning governor optimizing origin rate limits dynamically based on real-time latency & drop rate. |
+| [`adaptive_limiter.py`](file:///D:/myonsite/CacheSplit/core/adaptive_limiter.py) | Dynamic token bucket allowing live thread-safe updates to max_rps and burst capacity. |
 | [`rebac.py`](file:///D:/myonsite/CacheSplit/core/rebac.py) | Relationship-Based Access Control evaluator over relational graph edges. |
 | [`stampede_limiter.py`](file:///D:/myonsite/CacheSplit/core/stampede_limiter.py) | Token-bucket rate limiter preventing upstream origin overload. |
 | [`simulation_engine.py`](file:///D:/myonsite/CacheSplit/core/simulation_engine.py) | Lossy network simulation and convergence engine for cache stampede scenarios. |
@@ -90,6 +92,7 @@ CacheSplit is a distributed caching prototype and simulation engine built with *
 |---|---|
 | [`cache_store.py`](file:///D:/myonsite/CacheSplit/services/cache_store.py) | Regional cache store coordinating Merkle DAG operations with SQLite persistence. |
 | [`semantic_router.py`](file:///D:/myonsite/CacheSplit/services/semantic_router.py) | Semantic router intercepting queries, computing hit/miss scores, and managing access telemetry. |
+| [`adaptive_recovery_service.py`](file:///D:/myonsite/CacheSplit/services/adaptive_recovery_service.py) | Service linking RL Q-learning governor to live token limiter and recovery cycles. |
 | [`registry.py`](file:///D:/myonsite/CacheSplit/services/registry.py) | Node registration, heartbeat monitoring, and failure injection testing. |
 | [`audit_batcher.py`](file:///D:/myonsite/CacheSplit/services/audit_batcher.py) | Async ring buffer with micro-batched vectorized database flush ($500$ events / $100\text{ms}$). |
 | [`audit_trail_service.py`](file:///D:/myonsite/CacheSplit/services/audit_trail_service.py) | Query service for compliance logs with bad-data and risk filters. |
@@ -123,6 +126,7 @@ CacheSplit is a distributed caching prototype and simulation engine built with *
 | **Phase 24** | **10K+ Scaler & DHCP** | 30,000+ entity seeder, DHCP dynamic addressing, Cross-node permission governance | ✅ Complete |
 | **Phase 25** | **AgentDB Semantic Cache** | Vector indexing (Cosine/Euclidean/Dot), Hybrid metadata filters, MMR diversity, Semantic neighborhood invalidator | ✅ Complete |
 | **Phase 26** | **Hybrid Audit Vector Search** | Dense text & event embedder, hybrid relational search, natural language audit query API & UI | ✅ Complete |
+| **Phase 27** | **Adaptive RL Stampede Governor** | Q-learning governor, dynamic token bucket adaptation, auto-pilot recovery tuning API & UI | ✅ Complete |
 
 ### 4. API & User Interface (`api/` & `ui/`)
 - **FastAPI Endpoints**: Full CRUD and execution routers mounted in [`api/server.py`](file:///D:/myonsite/CacheSplit/api/server.py).
