@@ -46,7 +46,15 @@
         </svg>
         Developer Portal
       </div>
+      <div class="nav-item" data-page="page-simulator" data-label="Stampede Simulator (v4)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M13 3L8 8L5 5L2 9"/>
+          <path d="M10 3H13V6"/>
+        </svg>
+        v4 Simulator
+      </div>
     </div>
+
 
     <div class="nav-section">
       <div class="nav-section-label">Data</div>
@@ -485,7 +493,68 @@
       </div>
     </div>
 
+    <!-- ── Page: Stampede Simulator (v4) ───────────────────────── -->
+    <div id="page-simulator" class="page">
+      <div class="card mb-16">
+        <div class="card-header">
+          <h3>Stampede Recovery Simulator (v4)</h3>
+          <div class="btn-group">
+            <button class="btn btn-primary btn-sm" onclick="startSim()">⚡ Start / Reset</button>
+            <button class="btn btn-ghost btn-sm" onclick="triggerSimUpdate()">💥 Trigger Write (Lossy)</button>
+            <button class="btn btn-ghost btn-sm" onclick="stepSimRecovery()">🔁 Step Recovery</button>
+            <button class="btn btn-danger btn-sm" onclick="triggerSimOverlap()">🌪️ Overlapping Writes</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="grid-4 mb-16">
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">CONVERGENCE</div>
+              <div id="sim-val-converged" style="font-weight:600; font-size:16px; margin-top:4px;">—</div>
+            </div>
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">ORIGIN HITS</div>
+              <div id="sim-val-hits" style="font-weight:600; font-size:16px; margin-top:4px;">0</div>
+            </div>
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">OVERLOAD REJECTS</div>
+              <div id="sim-val-rejects" style="font-weight:600; font-size:16px; margin-top:4px;">0</div>
+            </div>
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">DEDUP SAVED READS</div>
+              <div id="sim-val-dedup" style="font-weight:600; font-size:16px; color:var(--accent); margin-top:4px;">0</div>
+            </div>
+          </div>
+
+          <div class="mb-16">
+            <div class="flex justify-between text-xs mb-4">
+              <span><strong>Origin Token Bucket (Capacity Ceiling):</strong></span>
+              <span id="sim-txt-bucket" style="font-family:monospace;">100%</span>
+            </div>
+            <div style="height:10px; background:var(--border); border-radius:5px; overflow:hidden;">
+              <div id="sim-fill-bucket" style="height:100%; width:100%; background:var(--accent); transition: width 0.3s;"></div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div>
+              <h4 class="text-sm font-semibold mb-8">Node State Matrix</h4>
+              <div id="sim-nodes-container" class="scroll-panel" style="max-height:260px; border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px; background:var(--surface-2);">
+                <div class="text-xs text-muted">Polling node states...</div>
+              </div>
+            </div>
+            <div>
+              <h4 class="text-sm font-semibold mb-8">Simulation Event Stream</h4>
+              <div id="sim-event-log" class="scroll-panel" style="max-height:260px; border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px; background:#18180F; color:#A8E6CF; font-family:monospace; font-size:11px; line-height:1.4;">
+                <div>Connecting to simulation stream...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /main-content -->
+
 </div><!-- /layout -->
 
 <!-- Edit Node Modal -->

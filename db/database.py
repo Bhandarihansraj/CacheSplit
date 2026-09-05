@@ -98,27 +98,19 @@ async def init_db(db_path: Optional[str] = None) -> aiosqlite.Connection:
     async with _db.executescript(CREATE_TABLES):
         pass
 
-    # ── Migration: add hashable_json if missing (DBs created before signing was added)
-    try:
-        await _db.execute("ALTER TABLE commit_log ADD COLUMN hashable_json TEXT NOT NULL DEFAULT ''")
-    except Exception:
-        pass  # column already exists
-
-    try:
-        await _db.execute("ALTER TABLE commit_log ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'")
-    except Exception:
-        pass
-
-    try:
-        await _db.execute("ALTER TABLE nodes ADD COLUMN handshake_status TEXT NOT NULL DEFAULT 'pending'")
-        await _db.execute("ALTER TABLE nodes ADD COLUMN join_token TEXT NOT NULL DEFAULT ''")
-    except Exception:
-        pass
-
-    try:
-        await _db.execute("ALTER TABLE entity_cache ADD COLUMN expires_at REAL")
-    except Exception:
-        pass
+    # ── Migrations: add columns if missing (safe schema evolutions)
+    migrations = [
+        "ALTER TABLE commit_log ADD COLUMN hashable_json TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE commit_log ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'",
+        "ALTER TABLE nodes ADD COLUMN handshake_status TEXT NOT NULL DEFAULT 'pending'",
+        "ALTER TABLE nodes ADD COLUMN join_token TEXT NOT NULL DEFAULT ''",
+        "ALTER TABLE entity_cache ADD COLUMN expires_at REAL",
+    ]
+    for sql in migrations:
+        try:
+            await _db.execute(sql)
+        except Exception as e:
+            logger.debug(f"Schema migration skipped or already applied: {e}")
 
     await _db.commit()
     logger.info(f"Database initialized at {resolved_path}")

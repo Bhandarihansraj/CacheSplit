@@ -63,14 +63,14 @@ async def run_full_scenario(config: dict) -> dict[str, Any]:
             node.seed(key, record)
     log("SEED", f"All {node_count} nodes seeded with {key_count} keys at v1")
 
-    # ── 3. First origin update — some invalidations dropped ─────────────────
+    # ── 3. First origin update -- some invalidations dropped ─────────────────
     updated_keys = keys[:2]
     for key in updated_keys:
         record = origin.update(key, {"value": 200, "gen": 1})
         result = await bus.broadcast(key, record.version)
         log(
             "INVALIDATION",
-            f"key={key} v{record.version} → delivered={result['delivered']} dropped={result['dropped']}",
+            f"key={key} v{record.version} -> delivered={result['delivered']} dropped={result['dropped']}",
             key=key, version=record.version,
         )
 
@@ -87,7 +87,8 @@ async def run_full_scenario(config: dict) -> dict[str, Any]:
     overlap_key = keys[0]
     record2 = origin.update(overlap_key, {"value": 300, "gen": 2})
     await bus.broadcast(overlap_key, record2.version)
-    log("OVERLAP", f"Second update for key={overlap_key} v{record2.version} — recovery in flight")
+    log("OVERLAP", f"Second update for key={overlap_key} v{record2.version} (recovery in flight)")
+
 
     # ── 6. Recovery cycles ───────────────────────────────────────────────────
     for cycle in range(max_cycles):

@@ -833,6 +833,94 @@ function startPolling() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// PAGE 8 — STAMPEDE SIMULATOR (v4)
+// ─────────────────────────────────────────────────────────────────────────
+async function pollSimSnapshot() {
+  const activePage = document.querySelector('.page.active')?.id;
+  if (activePage !== 'page-simulator') return;
+  try {
+    const data = await API.get('/api/sim/snapshot');
+    const convEl = document.getElementById('sim-val-converged');
+    if (convEl) {
+      convEl.innerText = data.converged ? 'CONVERGED' : 'DIVERGED';
+      convEl.style.color = data.converged ? 'var(--fresh)' : 'var(--danger)';
+    }
+    const hitsEl = document.getElementById('sim-val-hits');
+    if (hitsEl) hitsEl.innerText = data.origin_hits || 0;
+    const rejEl = document.getElementById('sim-val-rejects');
+    if (rejEl) rejEl.innerText = data.origin_rejects || 0;
+    const dedupEl = document.getElementById('sim-val-dedup');
+    if (dedupEl) dedupEl.innerText = data.dedup_savings || 0;
+
+    const pct = Math.round((data.bucket_level || 1.0) * 100);
+    const txtB = document.getElementById('sim-txt-bucket');
+    if (txtB) txtB.innerText = pct + '%';
+    const fillB = document.getElementById('sim-fill-bucket');
+    if (fillB) {
+      fillB.style.width = pct + '%';
+      fillB.style.background = pct > 40 ? 'var(--fresh)' : pct > 15 ? 'var(--stale)' : 'var(--danger)';
+    }
+
+    const container = document.getElementById('sim-nodes-container');
+    if (container) {
+      container.innerHTML = '';
+      (data.nodes || []).forEach(node => {
+        const div = document.createElement('div');
+        div.style.cssText = 'border:1px solid var(--border); border-radius:6px; padding:8px; margin-bottom:8px; background:var(--surface);';
+        let rows = '';
+        for (const [key, ent] of Object.entries(node.entries || {})) {
+          const origV = data.origin_versions ? data.origin_versions[key] : ent.version;
+          const badgeCls = ent.state === 'FRESH' ? 'badge-ok' : ent.state === 'STALE' ? 'badge-stale' : 'badge-quarantined';
+          rows += `<div class="flex justify-between text-xs" style="font-family:monospace; margin-bottom:2px;">
+            <span>${key}</span>
+            <span>v${ent.version} (orig: v${origV}) <span class="badge ${badgeCls}">${ent.state}</span></span>
+          </div>`;
+        }
+        div.innerHTML = `<div class="flex justify-between text-xs font-semibold mb-4" style="border-bottom:1px solid var(--border); padding-bottom:4px;">
+          <span>${node.node_id}</span><span class="text-muted">${node.region}</span>
+        </div>${rows}`;
+        container.appendChild(div);
+      });
+    }
+
+    const logEl = document.getElementById('sim-event-log');
+    if (logEl) {
+      logEl.innerHTML = '';
+      (data.event_log || []).forEach(evt => {
+        const d = document.createElement('div');
+        d.style.marginBottom = '2px';
+        d.innerText = `[${evt.type || 'EVENT'}] ${evt.detail || JSON.stringify(evt)}`;
+        logEl.appendChild(d);
+      });
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+  } catch (e) {
+    console.error('Error in pollSimSnapshot:', e);
+  }
+}
+
+async function startSim() {
+  await API.post('/api/sim/start', { node_count: 4, key_count: 5, drop_prob: 0.4, max_rps: 6.0, burst: 3 });
+  await pollSimSnapshot();
+}
+
+async function triggerSimUpdate() {
+  await API.post('/api/sim/update', {});
+  await pollSimSnapshot();
+}
+
+async function triggerSimOverlap() {
+  await API.post('/api/sim/update', { key: 'entity:0', data: { value: 300 } });
+  await API.post('/api/sim/update', { key: 'entity:1', data: { value: 400 } });
+  await pollSimSnapshot();
+}
+
+async function stepSimRecovery() {
+  await API.post('/api/sim/step', {});
+  await pollSimSnapshot();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Bootstrap
 // ─────────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -841,10 +929,11 @@ document.addEventListener('DOMContentLoaded', () => {
     item.addEventListener('click', () => {
       const page = item.dataset.page;
       switchPage(page);
-      if (page === 'page-ops')      loadNodeMap();
-      if (page === 'page-entities') { if (state.selectedNodeId) loadEntities(state.selectedNodeId); }
-      if (page === 'page-commits')  loadCommitLog();
-      if (page === 'page-security') loadSecurityFeed();
+      if (page === 'page-ops')       loadNodeMap();
+      if (page === 'page-entities')  { if (state.selectedNodeId) loadEntities(state.selectedNodeId); }
+      if (page === 'page-commits')   loadCommitLog();
+      if (page === 'page-security')  loadSecurityFeed();
+      if (page === 'page-simulator') pollSimSnapshot();
     });
   });
 
@@ -852,4 +941,6 @@ document.addEventListener('DOMContentLoaded', () => {
   loadNodeMap();
   initWebSocket();
   startPolling();
+  setInterval(pollSimSnapshot, 1500);
 });
+

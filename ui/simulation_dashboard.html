@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CacheSplit v4 — Stampede Recovery Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #F5F4EE;
+      --card-bg: #FFFFFF;
+      --text: #18180F;
+      --text-muted: #5E5D59;
+      --border: #E8E6DC;
+      --accent: #C16B3A;
+      --fresh: #27AE60;
+      --stale: #D35400;
+      --repair: #2980B9;
+      --danger: #C0392B;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      padding-bottom: 40px;
+    }
+    header {
+      background: var(--text);
+      color: var(--bg);
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    header h1 {
+      font-family: 'Newsreader', serif;
+      font-size: 22px;
+      font-weight: 500;
+      letter-spacing: -0.3px;
+    }
+    header nav a {
+      color: #C16B3A;
+      text-decoration: none;
+      font-size: 13px;
+      margin-left: 20px;
+      font-weight: 500;
+    }
+    header nav a:hover { text-decoration: underline; }
+    .container {
+      max-width: 1200px;
+      margin: 28px auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 24px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+    }
+    .card h2 {
+      font-family: 'Newsreader', serif;
+      font-size: 18px;
+      margin-bottom: 14px;
+      color: var(--text);
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: #FAFAF7;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all 0.15s;
+    }
+    .btn-primary { background: var(--accent); color: #FFF; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary { background: #EFECE1; color: var(--text); }
+    .btn-secondary:hover { background: #E4E0D2; }
+    .btn-danger { background: var(--danger); color: #FFF; }
+    
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      background: #FAFAF7;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-box .val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .stat-box .lbl {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    
+    .nodes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .node-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      background: #FAFAF7;
+    }
+    .node-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .node-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .node-region {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .key-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 4px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-fresh { background: #E8F8F0; color: var(--fresh); }
+    .badge-stale { background: #FDF2E9; color: var(--stale); }
+    .badge-repairing { background: #EBF5FB; color: var(--repair); }
+
+    .meter-container {
+      margin-top: 10px;
+      margin-bottom: 20px;
+    }
+    .meter-bar {
+      height: 12px;
+      background: #E8E6DC;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .meter-fill {
+      height: 100%;
+      background: var(--fresh);
+      width: 100%;
+      transition: width 0.3s, background 0.3s;
+    }
+
+    .log-container {
+      background: #18180F;
+      color: #A8E6CF;
+      border-radius: 8px;
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      max-height: 220px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+    .log-item { margin-bottom: 4px; }
+    .log-item.INVALIDATION { color: #F39C12; }
+    .log-item.INVALIDATION_DROPPED { color: #E74C3C; }
+    .log-item.CONVERGED { color: #2ECC71; font-weight: 600; }
+    .log-item.OVERLAP { color: #9B59B6; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>CacheSplit v4 · Stampede Recovery Simulator</h1>
+  <nav>
+    <a href="/dashboard">← Classic Dashboard</a>
+    <a href="/demo">Developer Portal →</a>
+  </nav>
+</header>
+
+<div class="container">
+  <!-- Sidebar Controls -->
+  <div>
+    <div class="card">
+      <h2>Simulation Control</h2>
+      <div class="form-group">
+        <label>Node Count</label>
+        <input type="number" id="cfg-nodes" value="4" min="1" max="10">
+      </div>
+      <div class="form-group">
+        <label>Key Count</label>
+        <input type="number" id="cfg-keys" value="5" min="1" max="20">
+      </div>
+      <div class="form-group">
+        <label>Drop Probability (0.0 - 1.0)</label>
+        <input type="number" id="cfg-drop" value="0.4" step="0.1" min="0" max="1">
+      </div>
+      <div class="form-group">
+        <label>Max Origin RPS</label>
+        <input type="number" id="cfg-rps" value="6.0" step="0.5" min="1" max="50">
+      </div>
+      <div class="form-group">
+        <label>Token Burst</label>
+        <input type="number" id="cfg-burst" value="3" min="1" max="20">
+      </div>
+      
+      <button class="btn btn-primary" onclick="startSim()">⚡ Reset & Start Simulation</button>
+      <button class="btn btn-secondary" onclick="triggerUpdate()">💥 Trigger Origin Write (Lossy)</button>
+      <button class="btn btn-secondary" onclick="stepRecovery()">🔁 Step Recovery Cycle</button>
+      <button class="btn btn-danger" style="margin-top:14px" onclick="triggerOverlap()">🌪️ Trigger Overlapping Writes</button>
+    </div>
+  </div>
+
+  <!-- Main Dashboard Area -->
+  <div>
+    <div class="card" style="margin-bottom: 24px;">
+      <h2>Cluster Performance Metrics</h2>
+      <div class="stats-row">
+        <div class="stat-box">
+          <div class="val" id="val-converged">—</div>
+          <div class="lbl">Convergence Status</div>
+        </div>
+        <div class="stat-box">
+          <div class="val" id="val-hits">0</div>
+          <div class="lbl">Origin Hits</div>
+        </div>
+        <div class="stat-box">
+          <div class="val" id="val-rejects">0</div>
+          <div class="lbl">Overload Rejects</div>
+        </div>
+        <div class="stat-box">
+          <div class="val" id="val-dedup" style="color:var(--fresh);">0</div>
+          <div class="lbl">Dedup Saved Reads</div>
+        </div>
+      </div>
+
+      <div class="meter-container">
+        <div style="display:flex; justify-content:space-between; font-size:12px;">
+          <span><strong>Origin Token Bucket Level:</strong></span>
+          <span id="txt-bucket" style="font-family:'JetBrains Mono',monospace;">100%</span>
+        </div>
+        <div class="meter-bar">
+          <div class="meter-fill" id="fill-bucket"></div>
+        </div>
+      </div>
+
+      <h2>Node State Matrix</h2>
+      <div class="nodes-grid" id="nodes-container">
+        <!-- Rendered dynamically -->
+      </div>
+
+      <h2>Live Cluster Event Log</h2>
+      <div class="log-container" id="event-log">
+        <div class="log-item">Connecting to simulation stream...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function pollSnapshot() {
+  try {
+    const res = await fetch('/api/sim/snapshot');
+    const data = await res.json();
+    render(data);
+  } catch (err) {
+    console.error('Error polling snapshot:', err);
+  }
+}
+
+function render(data) {
+  document.getElementById('val-converged').innerText = data.converged ? 'CONVERGED' : 'DIVERGED';
+  document.getElementById('val-converged').style.color = data.converged ? 'var(--fresh)' : 'var(--danger)';
+  document.getElementById('val-hits').innerText = data.origin_hits || 0;
+  document.getElementById('val-rejects').innerText = data.origin_rejects || 0;
+  document.getElementById('val-dedup').innerText = data.dedup_savings || 0;
+
+  const pct = Math.round((data.bucket_level || 1.0) * 100);
+  document.getElementById('txt-bucket').innerText = pct + '%';
+  const fill = document.getElementById('fill-bucket');
+  fill.style.width = pct + '%';
+  fill.style.background = pct > 40 ? 'var(--fresh)' : pct > 15 ? 'var(--stale)' : 'var(--danger)';
+
+  // Render nodes
+  const container = document.getElementById('nodes-container');
+  container.innerHTML = '';
+  (data.nodes || []).forEach(node => {
+    const div = document.createElement('div');
+    div.className = 'node-card';
+    let rows = '';
+    for (const [key, ent] of Object.entries(node.entries || {})) {
+      const origV = data.origin_versions ? data.origin_versions[key] : ent.version;
+      const stateClass = ent.state === 'FRESH' ? 'badge-fresh' : ent.state === 'STALE' ? 'badge-stale' : 'badge-repairing';
+      rows += `<div class="key-row">
+        <span>${key}</span>
+        <span>v${ent.version} (orig: v${origV}) <span class="badge ${stateClass}">${ent.state}</span></span>
+      </div>`;
+    }
+    div.innerHTML = `
+      <div class="node-card-header">
+        <span class="node-id">${node.node_id}</span>
+        <span class="node-region">${node.region}</span>
+      </div>
+      ${rows}
+    `;
+    container.appendChild(div);
+  });
+
+  // Render log
+  const logEl = document.getElementById('event-log');
+  logEl.innerHTML = '';
+  (data.event_log || []).forEach(evt => {
+    const d = document.createElement('div');
+    d.className = 'log-item ' + (evt.type || '');
+    d.innerText = `[${evt.type || 'EVENT'}] ${evt.detail || JSON.stringify(evt)}`;
+    logEl.appendChild(d);
+  });
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+async function startSim() {
+  const payload = {
+    node_count: parseInt(document.getElementById('cfg-nodes').value),
+    key_count: parseInt(document.getElementById('cfg-keys').value),
+    drop_prob: parseFloat(document.getElementById('cfg-drop').value),
+    max_rps: parseFloat(document.getElementById('cfg-rps').value),
+    burst: parseInt(document.getElementById('cfg-burst').value),
+  };
+  await fetch('/api/sim/start', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload)
+  });
+  pollSnapshot();
+}
+
+async function triggerUpdate() {
+  await fetch('/api/sim/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({})
+  });
+  pollSnapshot();
+}
+
+async function triggerOverlap() {
+  await fetch('/api/sim/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ key: 'entity:0', data: { value: 300 } })
+  });
+  await fetch('/api/sim/update', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ key: 'entity:1', data: { value: 400 } })
+  });
+  pollSnapshot();
+}
+
+async function stepRecovery() {
+  await fetch('/api/sim/step', { method: 'POST' });
+  pollSnapshot();
+}
+
+setInterval(pollSnapshot, 1000);
+pollSnapshot();
+</script>
+</body>
+</html>

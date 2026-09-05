@@ -72,16 +72,34 @@ def trigger_anomaly():
     except Exception as e:
         print(f"Error: {e}")
 
+def run_stampede_simulation():
+    print("\n--- Running Stampede Recovery Simulation ---")
+    try:
+        import subprocess
+        subprocess.run([sys.executable, "run_simulation.py"])
+    except Exception as e:
+        print(f"Error running simulation: {e}")
+
+def generate_dev_key():
+    url = f"{BASE_URL}/api/dev/keys"
+    try:
+        resp = requests.post(url)
+        print(f"\nResponse [{resp.status_code}]: {json.dumps(resp.json(), indent=2)}")
+    except Exception as e:
+        print(f"Error: {e}")
+
 def main():
     while True:
         print_banner()
         print("1) Handshake & Register a node")
         print("2) Submit a Compound Commit (Create User)")
-        print("3) Scan an Entity")
+        print("3) Scan an Entity (Nmap Cluster Scan)")
         print("4) Trigger a Security Anomaly")
-        print("5) Exit")
+        print("5) Run Stampede Recovery Simulation (v4)")
+        print("6) Generate Developer API Key")
+        print("7) Exit")
         
-        choice = input("\nSelect an option [1-5]: ").strip()
+        choice = input("\nSelect an option [1-7]: ").strip()
         
         if choice == '1':
             register_node()
@@ -91,7 +109,11 @@ def main():
             scan_entity()
         elif choice == '4':
             trigger_anomaly()
-        elif choice == '5' or choice.lower() in ('q', 'quit', 'exit'):
+        elif choice == '5':
+            run_stampede_simulation()
+        elif choice == '6':
+            generate_dev_key()
+        elif choice == '7' or choice.lower() in ('q', 'quit', 'exit'):
             print("Exiting...")
             sys.exit(0)
         else:
@@ -101,3 +123,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

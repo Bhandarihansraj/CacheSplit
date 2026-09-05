@@ -25,9 +25,11 @@ from api.users import router as users_router
 from api.payments import router as payments_router
 from api.scanner import router as scanner_router
 from api.developer import router as developer_router
+from api.simulation import router as simulation_router
 from services.sync_loop import sync_loop
 from services.raft_node import raft_node
 from services.write_behind import write_behind
+
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger(__name__)
@@ -102,6 +104,7 @@ app.include_router(users_router)
 app.include_router(payments_router)
 app.include_router(scanner_router)
 app.include_router(developer_router)
+app.include_router(simulation_router)
 
 
 # ──────────────────────── Core API Routes ────────────────────────────────────
@@ -212,41 +215,40 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         state_manager.disconnect(websocket)
 
-# ──────────────────────── Static UI (v4) ──────────────────────────────
+# ──────────────────────── Classic UI & Page Routes ───────────────────────────
 
 _ui_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ui"))
 _dashboard_file = os.path.join(_ui_dir, "dashboard.html")
-_v4_dashboard = os.path.join(_ui_dir, "v4_dashboard.html")
-_test_cases = os.path.join(_ui_dir, "test_cases.html")
+_sim_dashboard = os.path.join(_ui_dir, "simulation_dashboard.html")
 _dev_demo = os.path.join(_ui_dir, "developer_demo.html")
-_services_v4 = os.path.join(_ui_dir, "services_v4.js")
-_app_v4 = os.path.join(_ui_dir, "app_v4.js")
+_test_cases = os.path.join(_ui_dir, "test_cases.html")
 
 
 @app.get("/")
+@app.get("/dashboard")
 async def root():
-    if os.path.exists(_v4_dashboard):
-        return FileResponse(_v4_dashboard)
     if os.path.exists(_dashboard_file):
         return FileResponse(_dashboard_file)
     return {"status": "CacheSplit v4 running"}
 
 
+@app.get("/simulation")
+async def simulation_page():
+    if os.path.exists(_sim_dashboard):
+        return FileResponse(_sim_dashboard)
+    if os.path.exists(_dashboard_file):
+        return FileResponse(_dashboard_file)
+    return {"error": "Simulation dashboard not found"}
+
+
 @app.get("/demo")
 async def developer_demo():
-    demo_file = _dev_demo
-    if os.path.exists(demo_file):
-        return FileResponse(demo_file)
+    if os.path.exists(_dev_demo):
+        return FileResponse(_dev_demo)
     return {"error": "Demo file not found"}
 
 
-@app.get("/v4_dashboard.html")
-async def v4_dashboard():
-    if os.path.exists(_v4_dashboard):
-        return FileResponse(_v4_dashboard)
-    return {"error": "v4_dashboard.html not found"}
-
-
+@app.get("/test_cases")
 @app.get("/test_cases.html")
 async def test_cases():
     if os.path.exists(_test_cases):
@@ -254,20 +256,22 @@ async def test_cases():
     return {"error": "test_cases.html not found"}
 
 
-@app.get("/services_v4.js")
-async def services_v4():
-    if os.path.exists(_services_v4):
-        return FileResponse(_services_v4, media_type="application/javascript")
-    return {"error": "services_v4.js not found"}
+@app.get("/style.css")
+async def style_css():
+    css_file = os.path.join(_ui_dir, "style.css")
+    if os.path.exists(css_file):
+        return FileResponse(css_file, media_type="text/css")
+    return {"error": "style.css not found"}
 
 
-@app.get("/app_v4.js")
-async def app_v4():
-    if os.path.exists(_app_v4):
-        return FileResponse(_app_v4, media_type="application/javascript")
-    return {"error": "app_v4.js not found"}
+@app.get("/app.js")
+async def app_js():
+    js_file = os.path.join(_ui_dir, "app.js")
+    if os.path.exists(js_file):
+        return FileResponse(js_file, media_type="application/javascript")
+    return {"error": "app.js not found"}
 
 
-# Mount static files at /static for CSS and other assets
 if os.path.exists(_ui_dir):
     app.mount("/static", StaticFiles(directory=_ui_dir), name="static")
+
