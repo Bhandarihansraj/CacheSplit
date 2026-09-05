@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/dev", tags=["developer"])
 
 # In-memory store for MVP API Keys
-API_KEYS = set()
+API_KEYS = {"cs_live_55464b6bedb94e77b6444fe49c2e4a2c"}
 
 class APIKeyResponse(BaseModel):
     api_key: str

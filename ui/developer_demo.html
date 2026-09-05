@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CacheSplit Developer Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #F5F4EE; color: #18180F; min-height: 100vh; }
+    .header { background: #18180F; color: #F5F4EE; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; }
+    .header h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
+    .header .badge { background: #C16B3A; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .container { max-width: 1100px; margin: 40px auto; padding: 0 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .card { background: #fff; border: 1px solid #E8E6DC; border-radius: 12px; overflow: hidden; }
+    .card-header { padding: 16px 20px; border-bottom: 1px solid #E8E6DC; display: flex; align-items: center; justify-content: space-between; }
+    .card-header h3 { font-size: 14px; font-weight: 600; }
+    .card-body { padding: 20px; }
+    .full-width { grid-column: 1 / -1; }
+    label { display: block; font-size: 12px; font-weight: 500; color: #5E5D59; margin-bottom: 6px; margin-top: 14px; }
+    label:first-child { margin-top: 0; }
+    input, textarea, select { width: 100%; padding: 9px 12px; border: 1px solid #E8E6DC; border-radius: 8px; font-size: 13px; font-family: inherit; background: #FAFAF7; outline: none; transition: border-color .15s; }
+    input:focus, textarea:focus { border-color: #C16B3A; }
+    textarea { resize: vertical; min-height: 120px; font-family: 'Monaco', monospace; font-size: 12px; }
+    .btn { padding: 9px 18px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; transition: opacity .15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-primary { background: #C16B3A; color: #fff; }
+    .btn-ghost { background: #F0EEE6; color: #18180F; border: 1px solid #E8E6DC; }
+    .btn-danger { background: #c0392b; color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-top: 14px; }
+    .response-box { background: #18180F; color: #a8e6cf; border-radius: 8px; padding: 14px; font-family: monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; min-height: 80px; max-height: 300px; overflow-y: auto; margin-top: 14px; }
+    .api-key-display { background: #F0EEE6; border: 1px solid #E8E6DC; border-radius: 8px; padding: 10px 14px; font-family: monospace; font-size: 13px; color: #C16B3A; font-weight: 600; word-break: break-all; margin-top: 8px; }
+    .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+    .tab { padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; background: #F0EEE6; color: #5E5D59; border: 1px solid #E8E6DC; transition: all .15s; }
+    .tab.active { background: #C16B3A; color: #fff; border-color: #C16B3A; }
+    .op-panel { display: none; }
+    .op-panel.active { display: block; }
+    .status-ok { color: #27ae60; font-weight: 600; }
+    .status-err { color: #c0392b; font-weight: 600; }
+    .status-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 12px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #27ae60; display: inline-block; }
+    .dot.red { background: #c0392b; }
+    .copy-btn { background: none; border: 1px solid #E8E6DC; border-radius: 6px; padding: 4px 10px; font-size: 11px; cursor: pointer; color: #5E5D59; }
+    .copy-btn:hover { background: #F0EEE6; }
+    code { font-family: monospace; font-size: 12px; background: #F0EEE6; padding: 2px 6px; border-radius: 4px; }
+    .hint { font-size: 12px; color: #87867F; margin-top: 6px; line-height: 1.5; }
+    .scan-result-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #F0EEE6; font-size: 13px; }
+    .scan-result-row:last-child { border-bottom: none; }
+    .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-ok { background: #d5f5e3; color: #1e8449; }
+    .badge-stale { background: #fdebd0; color: #d35400; }
+    .badge-miss { background: #fce4e4; color: #c0392b; }
+    .intro { grid-column: 1/-1; background: #18180F; color: #F5F4EE; border-radius: 12px; padding: 24px 28px; }
+    .intro h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .intro p { color: #87867F; font-size: 14px; line-height: 1.6; }
+    .intro .key-chip { display: inline-block; background: #C16B3A22; border: 1px solid #C16B3A; color: #C16B3A; border-radius: 6px; padding: 3px 12px; font-family: monospace; font-size: 12px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>CacheSplit <span style="opacity:.5; font-weight:400">/ Developer Demo</span></h1>
+  <span class="badge">API Key Active</span>
+</div>
+
+<div class="container">
+
+  <!-- Intro Banner -->
+  <div class="intro">
+    <h2>CacheSplit Developer API Sandbox</h2>
+    <p>Perform all cache operations directly using your API key. Each panel below shows a live demo hitting <code style="background:#ffffff22;color:#F5F4EE">http://127.0.0.1:8000</code>. All responses stream into the console below each operation.</p>
+    <div class="key-chip" id="displayed-key">cs_live_55464b6bedb94e77b6444fe49c2e4a2c</div>
+  </div>
+
+  <!-- Config Card -->
+  <div class="card">
+    <div class="card-header">
+      <h3>🔑 Connection Config</h3>
+      <span class="status-row"><span class="dot" id="conn-dot"></span><span id="conn-status">Checking...</span></span>
+    </div>
+    <div class="card-body">
+      <label>API Base URL</label>
+      <input id="cfg-base" value="http://127.0.0.1:8000">
+      <label>API Key</label>
+      <input id="cfg-key" value="cs_live_55464b6bedb94e77b6444fe49c2e4a2c">
+      <div class="row">
+        <button class="btn btn-ghost btn-sm" onclick="testConnection()">Test Connection</button>
+        <button class="btn btn-ghost btn-sm" onclick="openDashboard()">Open Dashboard ↗</button>
+      </div>
+      <div class="response-box" id="cfg-result">// Connection status will appear here</div>
+    </div>
+  </div>
+
+  <!-- Node Map Card -->
+  <div class="card">
+    <div class="card-header"><h3>🌐 Cluster Node Map</h3></div>
+    <div class="card-body">
+      <p class="hint">Fetch the live status of all registered cluster nodes.</p>
+      <div class="row">
+        <button class="btn btn-primary" onclick="runOp('node-map')">Fetch Node Map</button>
+      </div>
+      <div class="response-box" id="node-map-result">// Results will appear here</div>
+    </div>
+  </div>
+
+  <!-- Dev Ops / Compound Commit -->
+  <div class="card">
+    <div class="card-header"><h3>✏️ Dev Ops — Compound Commit</h3></div>
+    <div class="card-body">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('patient')">Patient</div>
+        <div class="tab" onclick="switchTab('user')">User</div>
+        <div class="tab" onclick="switchTab('payment')">Payment</div>
+        <div class="tab" onclick="switchTab('custom')">Custom JSON</div>
+      </div>
+
+      <div class="op-panel active" id="panel-patient">
+        <label>Patient ID</label><input id="pt-id" value="pat_demo_001">
+        <label>Condition</label><input id="pt-cond" value="Stable">
+        <label>Status</label><input id="pt-status" value="Admitted">
+        <div class="row"><button class="btn btn-primary" onclick="commitPatient()">Commit Patient →</button></div>
+      </div>
+
+      <div class="op-panel" id="panel-user">
+        <label>User ID</label><input id="usr-id" value="usr_demo_001">
+        <label>Username</label><input id="usr-name" value="hansraj_dev">
+        <label>Role</label>
+        <select id="usr-role">
+          <option>admin</option><option>developer</option><option>viewer</option>
+        </select>
+        <div class="row"><button class="btn btn-primary" onclick="commitUser()">Commit User →</button></div>
+      </div>
+
+      <div class="op-panel" id="panel-payment">
+        <label>Payment ID</label><input id="pay-id" value="pay_demo_001">
+        <label>Amount (USD)</label><input id="pay-amt" type="number" value="250">
+        <label>Method</label>
+        <select id="pay-method">
+          <option>card</option><option>upi</option><option>bank_transfer</option>
+        </select>
+        <label>Link to Billing ID</label><input id="pay-billing" value="bill_demo_001">
+        <div class="row"><button class="btn btn-primary" onclick="commitPayment()">Commit Payment →</button></div>
+      </div>
+
+      <div class="op-panel" id="panel-custom">
+        <label>Raw Payload (JSON)</label>
+        <textarea id="custom-payload">{
+  "mutations": [
+    {
+      "entity_id": "custom_001",
+      "entity_type": "custom",
+      "data": {"key": "value", "demo": true}
+    }
+  ],
+  "edges": []
+}</textarea>
+        <div class="row"><button class="btn btn-primary" onclick="commitCustom()">Send Raw Commit →</button></div>
+      </div>
+
+      <div class="response-box" id="devops-result">// Commit response will appear here</div>
+    </div>
+  </div>
+
+  <!-- Nmap Scanner -->
+  <div class="card">
+    <div class="card-header"><h3>🔍 Nmap Entity Scanner</h3></div>
+    <div class="card-body">
+      <p class="hint">Scan a specific entity ID across all nodes to check propagation status.</p>
+      <label>Entity ID</label>
+      <input id="scan-id" value="pat_us_east_001">
+      <div class="row"><button class="btn btn-primary" onclick="runScan()">Scan Network →</button></div>
+      <div id="scan-result-table" style="margin-top:14px; border:1px solid #E8E6DC; border-radius:8px; overflow:hidden; display:none;"></div>
+      <div class="response-box" id="scan-result">// Scanner output</div>
+    </div>
+  </div>
+
+  <!-- Security Anomaly -->
+  <div class="card">
+    <div class="card-header"><h3>🛡️ Security Anomaly Injection</h3></div>
+    <div class="card-body">
+      <p class="hint">Simulate a cross-region scraping attack to trigger the ML anomaly detector.</p>
+      <label>Requesting Node ID</label><input id="sec-node" value="eu-west-1">
+      <label>Target Entity ID</label><input id="sec-entity" value="bill_rogue_999">
+      <div class="row"><button class="btn btn-danger" onclick="injectAnomaly()">Inject Anomaly →</button></div>
+      <div class="response-box" id="sec-result">// Security response will appear here</div>
+    </div>
+  </div>
+
+  <!-- Sharding Locator -->
+  <div class="card">
+    <div class="card-header"><h3>🗂️ Sharding Locator</h3></div>
+    <div class="card-body">
+      <p class="hint">Find which node on the Consistent Hash Ring owns a given entity.</p>
+      <label>Entity ID to Locate</label>
+      <input id="shard-id" value="pat_eu_west_007">
+      <div class="row"><button class="btn btn-primary" onclick="locateShard()">Locate →</button></div>
+      <div class="response-box" id="shard-result">// Sharding result</div>
+    </div>
+  </div>
+
+  <!-- Recent Commits -->
+  <div class="card full-width">
+    <div class="card-header">
+      <h3>📋 Recent Commit Log</h3>
+      <button class="btn btn-ghost btn-sm" onclick="loadCommits()">Refresh</button>
+    </div>
+    <div class="card-body">
+      <div class="response-box" id="commits-result" style="max-height:400px;">// Click Refresh to load recent commits</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_KEY = () => document.getElementById('cfg-key').value.trim();
+const BASE    = () => document.getElementById('cfg-base').value.trim();
+
+function headers() {
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY()}` };
+}
+
+function showResult(id, data, isErr=false) {
+  const el = document.getElementById(id);
+  el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  el.style.color = isErr ? '#ff6b6b' : '#a8e6cf';
+}
+
+async function testConnection() {
+  try {
+    const r = await fetch(`${BASE()}/api/dashboard/node-map`);
+    const d = await r.json();
+    document.getElementById('conn-dot').className = 'dot';
+    document.getElementById('conn-status').textContent = 'Connected';
+    showResult('cfg-result', `✅ Connected to CacheSplit v3\nNodes: ${(d.nodes||[]).length} active\nStatus: ${d.status||'ok'}`);
+  } catch(e) {
+    document.getElementById('conn-dot').className = 'dot red';
+    document.getElementById('conn-status').textContent = 'Disconnected';
+    showResult('cfg-result', `❌ Connection failed: ${e.message}\nIs the server running at ${BASE()}?`, true);
+  }
+}
+
+function openDashboard() { window.open(`${BASE()}/`, '_blank'); }
+
+async function runOp(op) {
+  try {
+    const r = await fetch(`${BASE()}/api/dashboard/node-map`);
+    const d = await r.json();
+    showResult('node-map-result', d);
+  } catch(e) { showResult('node-map-result', `Error: ${e.message}`, true); }
+}
+
+async function devOps(payload) {
+  try {
+    showResult('devops-result', '⏳ Sending commit...');
+    const r = await fetch(`${BASE()}/api/dev/ops`, {
+      method: 'POST', headers: headers(), body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    showResult('devops-result', d, !r.ok);
+  } catch(e) { showResult('devops-result', `Error: ${e.message}`, true); }
+}
+
+function commitPatient() {
+  devOps({ mutations: [{ entity_id: document.getElementById('pt-id').value, entity_type: 'patient', data: { condition: document.getElementById('pt-cond').value, status: document.getElementById('pt-status').value, updated_at: new Date().toISOString() }}], edges: [] });
+}
+
+function commitUser() {
+  devOps({ mutations: [{ entity_id: document.getElementById('usr-id').value, entity_type: 'user', data: { username: document.getElementById('usr-name').value, role: document.getElementById('usr-role').value, email: `${document.getElementById('usr-name').value}@demo.com` }}], edges: [] });
+}
+
+function commitPayment() {
+  const payId = document.getElementById('pay-id').value;
+  const billId = document.getElementById('pay-billing').value;
+  devOps({
+    mutations: [{ entity_id: payId, entity_type: 'payment', data: { amount: parseFloat(document.getElementById('pay-amt').value), method: document.getElementById('pay-method').value, status: 'completed', timestamp: new Date().toISOString() }}],
+    edges: [{ from_entity_id: billId, to_entity_id: payId, relationship_type: 'HAS_PAYMENT' }]
+  });
+}
+
+function commitCustom() {
+  try {
+    const payload = JSON.parse(document.getElementById('custom-payload').value);
+    devOps(payload);
+  } catch(e) { showResult('devops-result', `Invalid JSON: ${e.message}`, true); }
+}
+
+async function runScan() {
+  const eid = document.getElementById('scan-id').value;
+  try {
+    showResult('scan-result', `⏳ Scanning cluster for entity: ${eid}...`);
+    const r = await fetch(`${BASE()}/api/scan/${encodeURIComponent(eid)}`);
+    const d = await r.json();
+    showResult('scan-result', d);
+    // Render table
+    const table = document.getElementById('scan-result-table');
+    table.style.display = 'block';
+    const entries = Object.entries(d);
+    table.innerHTML = `<div style="padding:10px 14px;font-weight:600;font-size:12px;background:#F0EEE6;">Node Propagation Matrix — ${eid}</div>` +
+      entries.map(([node, info]) => {
+        const status = info.status || (info.version ? 'found' : 'missing');
+        const cls = status === 'missing' ? 'badge-miss' : status === 'stale' ? 'badge-stale' : 'badge-ok';
+        return `<div class="scan-result-row"><strong>${node}</strong><div style="display:flex;gap:10px;align-items:center"><span>v${info.version||'?'}</span><span class="badge ${cls}">${status}</span></div></div>`;
+      }).join('');
+  } catch(e) { showResult('scan-result', `Error: ${e.message}`, true); }
+}
+
+async function injectAnomaly() {
+  const node = document.getElementById('sec-node').value;
+  const entity = document.getElementById('sec-entity').value;
+  try {
+    showResult('sec-result', '⏳ Injecting anomaly...');
+    const r = await fetch(`${BASE()}/api/dashboard/security/test-anomaly`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ node_id: node, entity_id: entity, region: 'EU-West' })
+    });
+    const d = await r.json();
+    showResult('sec-result', d, !r.ok);
+  } catch(e) { showResult('sec-result', `Error: ${e.message}`, true); }
+}
+
+async function locateShard() {
+  const eid = document.getElementById('shard-id').value;
+  try {
+    const r = await fetch(`${BASE()}/api/sharding/locate/${encodeURIComponent(eid)}`);
+    const d = await r.json();
+    showResult('shard-result', d);
+  } catch(e) { showResult('shard-result', `Error: ${e.message}`, true); }
+}
+
+async function loadCommits() {
+  try {
+    const r = await fetch(`${BASE()}/api/dashboard/commits/recent?limit=20`);
+    const d = await r.json();
+    showResult('commits-result', d);
+  } catch(e) { showResult('commits-result', `Error: ${e.message}`, true); }
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['patient','user','payment','custom'][i]===name));
+  document.querySelectorAll('.op-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(`panel-${name}`).classList.add('active');
+}
+
+// Auto-test on load
+window.addEventListener('DOMContentLoaded', () => {
+  testConnection();
+  loadCommits();
+});
+</script>
+</body>
+</html>

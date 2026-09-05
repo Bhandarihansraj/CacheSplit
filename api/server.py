@@ -213,5 +213,14 @@ async def root():
     return {"status": "CacheSplit v3 running"}
 
 
+@app.get("/demo")
+async def developer_demo():
+    demo_file = os.path.join(_ui_dir, "developer_demo.html")
+    if os.path.exists(demo_file):
+        return FileResponse(demo_file)
+    return {"error": "Demo file not found"}
+
+
+
 if os.path.exists(_ui_dir):
     app.mount("/", StaticFiles(directory=_ui_dir, html=True), name="ui")
