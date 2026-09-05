@@ -23,6 +23,8 @@ from api.query import router as query_router
 from api.propagation import router as propagation_router
 from api.users import router as users_router
 from api.payments import router as payments_router
+from api.scanner import router as scanner_router
+from services.sync_loop import sync_loop
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger(__name__)
@@ -64,10 +66,12 @@ async def lifespan(app: FastAPI):
 
     # Start background health sweep + auto-heartbeat emitter
     registry.start_sweep(enable_auto_heartbeat=True)
+    sync_loop.start()
     logger.info("CacheSplit v3 ready — http://127.0.0.1:8000")
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
+    sync_loop.stop()
     registry.stop_sweep()
     await close_db()
     logger.info("Server shutdown complete.")
@@ -88,6 +92,7 @@ app.include_router(query_router)
 app.include_router(propagation_router)
 app.include_router(users_router)
 app.include_router(payments_router)
+app.include_router(scanner_router)
 
 
 # ──────────────────────── Core API Routes ────────────────────────────────────

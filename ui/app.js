@@ -607,6 +607,67 @@ async function injectAnomaly() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// PAGE 6 — SCANNER
+// ─────────────────────────────────────────────────────────────────────────
+async function runScanner() {
+  const resultEl = document.getElementById('scan-result');
+  const entityId = document.getElementById('scan-entity-id').value.trim();
+  if (!entityId) {
+    resultEl.innerHTML = `<div class="result-err">Entity ID required.</div>`;
+    return;
+  }
+  resultEl.innerHTML = `<div class="state-msg"><div class="spinner"></div><span>Scanning nodes…</span></div>`;
+  try {
+    const data = await API.get(`/api/scan/${entityId}`);
+    renderScannerResults(data, resultEl);
+  } catch (e) {
+    resultEl.innerHTML = `<div class="result-err">Scan failed<br><span class="text-xs">${e.message}</span></div>`;
+  }
+}
+
+function renderScannerResults(data, container) {
+  const matrix = data.matrix || {};
+  const nodes = Object.keys(matrix);
+  if (!nodes.length) {
+    container.innerHTML = `<div class="state-msg text-muted">No nodes available.</div>`;
+    return;
+  }
+  let html = `<div class="feed">`;
+  nodes.forEach(nodeId => {
+    const res = matrix[nodeId];
+    let badge = '';
+    let dotColor = 'var(--text-3)';
+    
+    if (res.status === 'primary') {
+      badge = '<span class="badge badge-ok">Primary</span>';
+      dotColor = 'var(--accent-2)';
+    } else if (res.status === 'replica') {
+      badge = '<span class="badge badge-neutral">Replica</span>';
+      dotColor = 'var(--accent-1)';
+    } else if (res.status === 'missing') {
+      badge = '<span class="badge badge-stale">Missing</span>';
+      dotColor = 'var(--stale)';
+    } else {
+      badge = `<span class="badge badge-quarantine">${res.status}</span>`;
+      dotColor = 'var(--danger)';
+    }
+
+    html += `
+      <div class="feed-item">
+        <div class="feed-dot" style="background:${dotColor}"></div>
+        <div class="feed-body">
+          <div class="feed-title">${nodeId}</div>
+          <div class="feed-meta">Version: ${res.version || '—'} · Hash: ${res.hash ? res.hash.slice(0,16)+'…' : '—'}</div>
+        </div>
+        <div class="feed-badge">${badge}</div>
+      </div>
+    `;
+  });
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Confirm Dialog
 // ─────────────────────────────────────────────────────────────────────────
 function confirmAction(message, onConfirm) {

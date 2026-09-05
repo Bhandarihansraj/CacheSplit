@@ -109,6 +109,11 @@ async def init_db(db_path: Optional[str] = None) -> aiosqlite.Connection:
     except Exception:
         pass
 
+    try:
+        await _db.execute("ALTER TABLE entity_cache ADD COLUMN expires_at REAL")
+    except Exception:
+        pass
+
     await _db.commit()
     logger.info(f"Database initialized at {resolved_path}")
     return _db

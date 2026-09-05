@@ -91,3 +91,9 @@ phasecontrol/  Phase implementation notes
 - README/`PROJECT_INDEX.md` phase checkmarks describe *intent*, not independent validation.
 
 Everything documented above is what actually runs and is covered by the test suite.
+
+## Completed Phases
+
+- **Phase 15:** Security Event Feed & ReBAC visualization integrated into dashboard.
+- **Phase 16:** Extracted API routes (users, payments, propagation, query, scanner) to modularize the application.
+- **Phase 17:** Added `ops/demo_menu.py` for a CLI-based interactive demo of core functionality.
