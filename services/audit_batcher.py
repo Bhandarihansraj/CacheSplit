@@ -40,6 +40,14 @@ class AuditBatcher:
             self._worker_task = asyncio.create_task(self._flush_loop())
             logger.info("AuditBatcher: Background flusher worker started")
 
+    async def flush(self):
+        """Drain and persist any remaining events in queue immediately."""
+        batch: List[Dict[str, Any]] = []
+        while not self._queue.empty():
+            batch.append(self._queue.get_nowait())
+        if batch:
+            await self._persist_batch(batch)
+
     def stop(self):
         if self._running:
             self._running = False

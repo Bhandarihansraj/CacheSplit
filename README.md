@@ -232,7 +232,7 @@ pytest tests/ -v
 ```
 
 ### Test Suite Summary:
-- **146/146 Unit & Integration Tests Passing (100%)**
+- **158/158 Unit & Integration Tests Passing (100%)**
 - Covers:
   - Merkle-DAG ripple integrity and compound commit atomicity.
   - ReBAC authorization and graph anomaly detection.

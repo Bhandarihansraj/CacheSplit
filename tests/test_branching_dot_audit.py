@@ -170,8 +170,9 @@ async def test_audit_batcher_and_service():
             "timestamp": time.time(),
         })
 
-    # Allow flusher loop to persist
-    await asyncio.sleep(0.2)
+    # Allow flusher loop to persist and flush remaining
+    await asyncio.sleep(0.1)
+    await batcher.flush()
     batcher.stop()
 
     assert batcher.total_ingested == 15
