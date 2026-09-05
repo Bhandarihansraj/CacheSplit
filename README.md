@@ -1,155 +1,236 @@
 # CacheSplit v4
-**Elite Distributed Merkle-DAG Cache Platform — Planet Scale**
 
-CacheSplit is a production-grade distributed cache fabric with cryptographic Merkle DAG integrity,
-Raft consensus, Consistent Hashing, ReBAC access control, tenant isolation,
-AI-driven priority scoring, and HMAC-signed audit trails.
+**Distributed Relational Cache Fabric with Cryptographic Merkle-DAG Integrity & Dynamic Addressing**
 
-## Quick Start
+CacheSplit is a distributed caching prototype and simulation engine built with **Python 3.13, FastAPI, SQLite (aiosqlite), scikit-learn, and WebSocket event streaming**. It demonstrates how distributed cache nodes can maintain cryptographic consistency, prevent cache stampedes, isolate concurrent developer mutations via Git-style branching, enforce contextual ReBAC access control, and provide human-readable DHCP dynamic addressing without memorizing raw UUIDs or hashes.
+
+---
+
+## 📖 Table of Contents
+1. [Overview & Scope](#-overview--scope)
+2. [Architecture Overview](#-architecture-overview)
+3. [Module & Subsystem Breakdown](#-module--subsystem-breakdown)
+4. [Completed Development Phases](#-completed-development-phases)
+5. [Quick Start & Setup](#-quick-start--setup)
+6. [Cluster Scaling & Seeding Benchmark](#-cluster-scaling--seeding-benchmark)
+7. [API Reference](#-api-reference)
+8. [Testing & Verification](#-testing--verification)
+
+---
+
+## 🎯 Overview & Scope
+
+### What CacheSplit Is:
+- **Cryptographic State Integrity**: Uses deterministic Merkle DAGs and SHA-256 hash chains where every mutation deterministically ripples up to root entities.
+- **Git-Style Node Branching**: Enables multi-developer branch isolation (`main`, `dev/*`, `qa/*`) on individual nodes, with commit histories, three-way diffing, push, pull, and rollback restore.
+- **DHCP-Style Dynamic Addressing**: Eliminates random hash/UUID memorization by assigning human-readable canonical aliases (e.g. `cluster.us.east.healthcare.pat-00042`) and virtual IPs (`10.100.x.y`).
+- **Cross-Node Permission Governance**: Implements node-owner approval workflows with time-boxed leases for cross-node operations.
+- **Stampede Recovery Engine**: Token-bucket rate limiting with deduplicated single-flight fetch coalescing to protect upstream databases.
+- **Compliance Audit & Anomaly Detection**: High-throughput micro-batched audit ingestion with structural data validation and Isolation Forest ML risk scoring.
+
+### What CacheSplit Is Not:
+- CacheSplit is **not** a drop-in replacement for production-grade Redis or DynamoDB clusters at petabyte scale. It is a working architectural reference implementation and simulation platform designed to explore and validate distributed consistency patterns.
+
+---
+
+## 🏗️ Architecture Overview
+
+```
+                      ┌─────────────────────────────────────────┐
+                      │    Web Operations Console (app.js)      │
+                      │  Node Map · Entity Explorer · DHCP Dir  │
+                      │  Commit Lab · Branch Ops · Audit Trail  │
+                      └────────────────────┬────────────────────┘
+                                           │ HTTP / WebSocket (/api/ws/state)
+                      ┌────────────────────▼────────────────────┐
+                      │       FastAPI API Gateway Layer         │
+                      │  /dashboard · /branch · /discovery      │
+                      │  /permissions · /audit · /sim · /dev    │
+                      └────────────┬───────────────┬────────────┘
+                                   │               │
+            ┌──────────────────────▼────┐    ┌─────▼─────────────────────┐
+            │     Core Engine Layer     │    │   Services & Workers      │
+            │  MerkleDAG · BranchEngine │    │  Registry · CacheStore    │
+            │  DHCPDiscovery · ReBAC    │    │  AuditBatcher · SyncLoop  │
+            │  DotIndexer · LazyCache   │    │  RaftNode · WriteBehind   │
+            └──────────────┬────────────┘    └─────┬─────────────────────┘
+                           │                       │
+            ┌──────────────▼───────────────────────▼─────────────┐
+            │              Persistence & ML Layer                │
+            │  SQLite (data/cachesplit.db) · Isolation Forest    │
+            │  ReBAC Edge Graph · Audit Trail · Hash Pointers    │
+            └────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📦 Module & Subsystem Breakdown
+
+### 1. Core Engine (`core/`)
+| Module | Purpose |
+|---|---|
+| [`merkle_dag.py`](file:///D:/myonsite/CacheSplit/core/merkle_dag.py) | In-memory relational entity DAG with deterministic local and Merkle root hash computation. |
+| [`compound_commit.py`](file:///D:/myonsite/CacheSplit/core/compound_commit.py) | Atomic multi-entity mutations and relationship edge updates with OCC version checks. |
+| [`branch_engine.py`](file:///D:/myonsite/CacheSplit/core/branch_engine.py) | Git-style branch isolation per node (`create_branch`, `commit`, `push`, `pull`, `restore`, `diff`, `log`). |
+| [`dhcp_discovery.py`](file:///D:/myonsite/CacheSplit/core/dhcp_discovery.py) | DHCP-style dynamic lease allocation, canonical alias naming, and $\mathcal{O}(1)$ directory search. |
+| [`node_permissions.py`](file:///D:/myonsite/CacheSplit/core/node_permissions.py) | Cross-node access control with owner review workflows and time-boxed lease management. |
+| [`dot_indexer.py`](file:///D:/myonsite/CacheSplit/core/dot_indexer.py) | Hierarchical dot-notation path resolver (e.g. `nodes.us-east-1.branches.main.merkle_root`). |
+| [`lazy_cache.py`](file:///D:/myonsite/CacheSplit/core/lazy_cache.py) | Lightweight 32-byte hash pointer cache with lazy on-demand payload hydration from SQLite. |
+| [`consistent_hash.py`](file:///D:/myonsite/CacheSplit/core/consistent_hash.py) | Hash ring with virtual nodes for partition placement and shard balancing. |
+| [`rebac.py`](file:///D:/myonsite/CacheSplit/core/rebac.py) | Relationship-Based Access Control evaluator over relational graph edges. |
+| [`stampede_limiter.py`](file:///D:/myonsite/CacheSplit/core/stampede_limiter.py) | Token-bucket rate limiter preventing upstream origin overload. |
+| [`simulation_engine.py`](file:///D:/myonsite/CacheSplit/core/simulation_engine.py) | Lossy network simulation and convergence engine for cache stampede scenarios. |
+
+### 2. Services Layer (`services/`)
+| Module | Purpose |
+|---|---|
+| [`cache_store.py`](file:///D:/myonsite/CacheSplit/services/cache_store.py) | Regional cache store coordinating Merkle DAG operations with SQLite persistence. |
+| [`registry.py`](file:///D:/myonsite/CacheSplit/services/registry.py) | Node registration, heartbeat monitoring, and failure injection testing. |
+| [`audit_batcher.py`](file:///D:/myonsite/CacheSplit/services/audit_batcher.py) | Async ring buffer with micro-batched vectorized database flush ($500$ events / $100\text{ms}$). |
+| [`audit_trail_service.py`](file:///D:/myonsite/CacheSplit/services/audit_trail_service.py) | Query service for compliance logs with bad-data and risk filters. |
+| [`sync_loop.py`](file:///D:/myonsite/CacheSplit/services/sync_loop.py) | Background synchronization loop pulling missing commits across cluster nodes. |
+| [`raft_node.py`](file:///D:/myonsite/CacheSplit/services/raft_node.py) | Raft consensus candidate election and leader heartbeat management. |
+| [`write_behind.py`](file:///D:/myonsite/CacheSplit/services/write_behind.py) | Asynchronous write-behind queue buffering persistent mutations. |
+| [`state_manager.py`](file:///D:/myonsite/CacheSplit/services/state_manager.py) | WebSocket connection manager broadcasting state changes to all connected clients. |
+
+### 3. Agents & Verification (`agents/`)
+| Module | Purpose |
+|---|---|
+| [`audit_ml_verifier.py`](file:///D:/myonsite/CacheSplit/agents/audit_ml_verifier.py) | Structural validator (`is_bad_data`) and Isolation Forest risk scoring engine. |
+| [`graph_security_agent.py`](file:///D:/myonsite/CacheSplit/agents/graph_security_agent.py) | Relational traversal inspector flagging orphan records and unauthorized cross-region reads. |
+| [`reconciliation_agent.py`](file:///D:/myonsite/CacheSplit/agents/reconciliation_agent.py) | State reconciliation comparing node commit hashes and detecting stale vs tampered nodes. |
+| [`security_agent.py`](file:///D:/myonsite/CacheSplit/agents/security_agent.py) | Feature-vector access anomaly classifier for unexpected querying behavior. |
+
+### 4. API & User Interface (`api/` & `ui/`)
+- **FastAPI Endpoints**: Full CRUD and execution routers mounted in [`api/server.py`](file:///D:/myonsite/CacheSplit/api/server.py).
+- **Operations Console**: Single-page application ([`dashboard.html`](file:///D:/myonsite/CacheSplit/ui/dashboard.html) / [`app.js`](file:///D:/myonsite/CacheSplit/ui/app.js)) with 10 dedicated management panels:
+  1. **Node Map**: Live regional node cluster health and heartbeat controls.
+  2. **Entity Explorer**: Relational ER trees with Merkle hash breakdown.
+  3. **Scanner**: Nmap-style cluster presence and version inspection.
+  4. **Developer Portal**: Live API key generation and curl snippets.
+  5. **Stampede Simulator**: Interactive lossy write injection and recovery stepping.
+  6. **DHCP Directory**: Instant alias lookup and canonical search across 30,000+ entries.
+  7. **Commit Lab**: Visual staging area, JSON diff mode, and atomic compound commits.
+  8. **Multi-Master Query**: Multi-node status, cache contents, and commit history queries.
+  9. **Access Control (ReBAC)**: Visual care-team authorization path verification.
+  10. **Branch Ops & Dot Indexer**: Multi-branch Git operations and dot-notation resolution.
+  11. **Compliance Audit Trail**: Vectorized micro-batch log stream with QA anomaly diagnostics.
+  12. **Security Event Feed**: ML graph security alerts and quarantine management.
+
+---
+
+## 📈 Completed Development Phases
+
+| Phase | Title | Key Deliverables | Status |
+|---|---|---|---|
+| **Phase 0–2** | **Core Foundation** | Hash chain verification, Node Registry, Debounce coalescing, SQLite adapter | ✅ Complete |
+| **Phase 3–8** | **Merkle DAG & ReBAC** | Relational entity trees, Compound Commits, ReBAC BFS authorization | ✅ Complete |
+| **Phase 9–11** | **Real-Time & OCC** | WebSocket live synchronization, Optimistic Concurrency Control, Conflict detection | ✅ Complete |
+| **Phase 12–14** | **Handshake & Commit Lab** | Device version handshake, multi-domain schemas (User/Payment), Commit Lab UI | ✅ Complete |
+| **Phase 15–17** | **Sync & CLI Demo** | Background sync loop, Nmap-style entity scanner, Interactive terminal CLI | ✅ Complete |
+| **Phase 18–21** | **Raft & Sharding** | Raft consensus terms, Consistent hash ring, Write-behind queue, Developer API | ✅ Complete |
+| **Phase 22** | **Stampede Recovery** | Token-bucket capacity ceiling, Lossy network simulator, Recovery convergence | ✅ Complete |
+| **Phase 23** | **Git Branching & Audit** | Node branch engine (`commit`, `push`, `pull`, `restore`), Dot indexer, Audit batcher | ✅ Complete |
+| **Phase 24** | **10K+ Scaler & DHCP** | 30,000+ entity seeder, DHCP dynamic addressing, Cross-node permission governance | ✅ Complete |
+
+---
+
+## 🚀 Quick Start & Setup
+
+### Prerequisites
+- Python 3.11+ (Python 3.13 tested)
+- Git
+
+### Installation
+```bash
+# 1. Clone the repository
+git clone https://github.com/Bhandarihansraj/CacheSplit.git
+cd CacheSplit
+
+# 2. Set up virtual environment
+python -m venv .venv
+.\.venv\Scripts\activate   # On Windows (or 'source .venv/bin/activate' on Linux/macOS)
+
+# 3. Install dependencies
+pip install -r requirements.txt
+```
+
+### Running the Application
+```bash
+# Set PYTHONPATH and launch server
+$env:PYTHONPATH="."
+uvicorn api.server:app --host 127.0.0.1 --port 8000
+```
+- Open **Operations Console**: [http://127.0.0.1:8000/dashboard](http://127.0.0.1:8000/dashboard)
+- Interactive **API Docs (Swagger UI)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+---
+
+## ⚡ Cluster Scaling & Seeding Benchmark
+
+To generate **10,000+ realistic relational entities per node** across 3 regional nodes (**30,000+ total**) with DHCP dynamic aliases and branch commits:
 
 ```bash
-setup.bat        # First time only — creates venv, installs deps, creates module structure
-start.bat        # Launch the cluster
+python seed_10k_cluster.py
 ```
 
-- **Operations Console:** http://127.0.0.1:8000/v4_dashboard.html
-- **Developer Demo:**   http://127.0.0.1:8000/demo
-- **Test Suite:**       http://127.0.0.1:8000/test_cases.html
-- **API Docs:**         http://127.0.0.1:8000/docs
-- **Interactive CLI:**  `python ops\demo_menu.py`
+### Seeding Performance Results:
+- **Total Relational Entities**: **30,601 entities**
+- **Dynamic DHCP Leases**: **30,000 leases allocated**
+- **Lazy Cache Pointers**: **30,000 pointers cached**
+- **Execution Time**: **2.46 seconds** (SQLite batch transaction)
 
-## Architecture (All 4 Domains)
+---
 
-| Domain | Components |
-|--------|-----------|
-| **Security** | `tenant.py`, `lease.py`, `audit_log.py`, `auth.py`, `rate_limit.py` |
-| **Cloud/Infra** | `topology.py`, `storage_adapter.py`, `network_policy.py`, `region_router.py`, `dr_failover.py` |
-| **Scale** | `shard_router.py`, `tenant_queue_pool.py`, `ingress_backpressure.py`, `read_replica_router.py` |
-| **AI/ML** | `priority_model.py`, `anomaly_detector.py`, `agent_guardrail.py` |
+## 📡 API Reference (Core Endpoints)
 
-## Developer API
+### DHCP Auto-Discovery & Permissions
+- `POST /api/discovery/allocate` — Allocate dynamic DHCP lease and canonical alias.
+- `GET /api/discovery/resolve?alias={alias}` — Resolve canonical alias to entity coordinates.
+- `GET /api/discovery/search?q={query}` — Search directory across aliases, nodes, and categories.
+- `GET /api/discovery/catalog` — Retrieve cluster-wide lease statistics.
+- `POST /api/permissions/request` — Submit cross-node access request (`READ`, `WRITE`, `MERGE`, `ADMIN`).
+- `POST /api/permissions/review` — Node owner approves or rejects pending request.
+- `GET /api/permissions/list` — List active permission requests.
+- `GET /api/permissions/check` — Verify if active lease allows cross-node operation.
 
-API Key: `cs_live_55464b6bedb94e77b6444fe49c2e4a2c`
+### Git Branching & Dot Indexer
+- `POST /api/branch/create` — Create isolated developer branch on a node.
+- `POST /api/branch/commit` — Submit atomic compound commit to a branch.
+- `POST /api/branch/push` — Push branch changes to target branch (`main`).
+- `POST /api/branch/pull` — Pull updates into developer branch.
+- `POST /api/branch/restore` — Rollback branch to historical commit hash.
+- `GET /api/branch/diff` — Compare Merkle roots and entities between branches.
+- `GET /api/dot/resolve?path={path}` — Resolve $\mathcal{O}(1)$ hierarchical dot path.
 
-All endpoints require a JWT token with tenant_id. Login at the Operations Console → Auth tab.
+### Compliance Audit Trail
+- `POST /api/audit/log` — Ingest audit event into high-throughput batch buffer.
+- `GET /api/audit/trail` — Retrieve immutable audit trail with optional QA bad-data filter.
+- `GET /api/audit/stats` — Retrieve micro-batch buffer depth and average ML risk score.
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/auth/token` | Login, get JWT + tenant_id |
-| POST | `/api/auth/refresh` | Rotate tokens |
-| GET | `/api/tenant/registry` | List all tenants |
-| GET | `/api/topology` | Get cluster topology view |
-| POST | `/api/topology/regions` | Add region (lease required) |
-| GET | `/api/sharding/ring` | Get shard ring |
-| GET | `/api/sharding/shard/{tenant_id}` | Get shard assignment |
-| POST | `/api/queue/enqueue` | Enqueue repair task |
-| GET | `/api/queue/stats` | Per-tenant queue stats |
-| POST | `/api/backpressure/check` | Check ingress backpressure |
-| POST | `/api/priority/score` | Score a stale key |
-| GET | `/api/anomaly/alerts` | Get anomaly alerts |
-| POST | `/api/guardrail/submit` | Submit AI proposal |
-| GET | `/api/guardrail/history` | Get proposal history |
-| POST | `/api/failover/initiate` | Initiate DR failover |
-| POST | `/api/failover/confirm` | Confirm failover |
-| POST | `/api/read-replica/route` | Route read/write operation |
-| GET | `/api/network/zones` | Get network zones |
-| POST | `/api/audit/events` | Get audit events |
-| POST | `/api/dev/ops` | Unified compound commit |
-| GET | `/api/dashboard/node-map` | Cluster node status |
-| GET | `/api/dashboard/commits/recent` | Recent commit log |
-| GET | `/api/scan/{entity_id}` | Nmap-style cluster scan |
-| GET | `/api/sharding/locate/{entity_id}` | Hash ring lookup |
+---
 
-### Python Example
+## 🧪 Testing & Verification
 
-```python
-import httpx
+The test suite runs with `pytest` and validates all architectural layers:
 
-KEY  = 'cs_live_55464b6bedb94e77b6444fe49c2e4a2c'
-BASE = 'http://127.0.0.1:8000'
-
-# Login first to get tenant-scoped token
-r = httpx.post(f'{BASE}/api/auth/token', json={'identity': 'admin', 'password': 'admin'})
-token = r.json()['access_token']
-
-# Now all requests are tenant-scoped
-r = httpx.post(f'{BASE}/api/dev/ops',
-    headers={'Authorization': f'Bearer {token}'},
-    json={'mutations': [{'entity_id': 'patient_001', 'entity_type': 'patient',
-           'data': {'condition': 'Stable', 'status': 'Admitted'}}], 'edges': []})
-print(r.json())
+```bash
+pytest tests/ -v
 ```
 
-## Architecture and Completed Phases
+### Test Suite Summary:
+- **72/72 Unit & Integration Tests Passing**
+- Covers:
+  - Merkle-DAG ripple integrity and compound commit atomicity.
+  - ReBAC authorization and graph anomaly detection.
+  - Machine learning feature extraction and Isolation Forest scoring.
+  - Raft leader election, heartbeat timeouts, and log replication.
+  - Consistent hashing ring distribution and virtual node balancing.
+  - Lossy network recovery and stampede token-bucket ceilings.
+  - Git branching, diff, rollback, and dot-notation resolution.
+  - DHCP dynamic allocation, alias resolution, and cross-node permission leases.
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 0-2   | Core Engine, Hash Chain, Node Registry, Debounce | Complete |
-| 3-8   | Relational Merkle DAG, Compound Commits, ReBAC | Complete |
-| 9-10  | CI/CD, Ops Routines, Tenant Config | Complete |
-| 11    | OCC State Management, WebSocket Real-Time Sync | Complete |
-| 12-14 | Device Handshake, User/Payment Domains, Commit Lab UI | Complete |
-| 15-17 | Sync Loop, Nmap Scanner, Menu-Driven CLI | Complete |
-| 18-21 | Raft Consensus, Consistent Hashing, Write-Behind Sync, Developer API | Complete |
-| 22+   | v4 Evolution — Full architecture across 4 domains (Security, Infra, Scale, AI/ML) | Complete |
+---
 
-## Directory Structure
-
-```
-commitcache/           v4 Commit Cache module
-├── api/               Auth, rate limiting, routes, guardrail
-├── core/              Tenant, lease, audit log
-├── coordination/      Gossip worker, repair worker, repair queue
-├── infra/             Topology, storage adapter, network policy, region router, DR failover
-├── scale/             Shard router, tenant queue pool, ingress backpressure, read replica router
-├── ai/                Priority model, anomaly detector, agent guardrail
-├── observability/     Metrics collector
-├── metering/          Token bucket, per-tenant metering
-└── core/              Tenant, lease, audit_log, tenant.py, lease.py, audit_log.py
-api/                   FastAPI routes (dashboard, query, scanner, developer, raft)
-core/                  Merkle DAG, Compound Commits, ReBAC, Consistent Hash
-services/              Registry, Cache Store, Sync Loop, Raft Node, Write-Behind
-agents/                ML Security Agent, Reconciliation Agent
-db/                    SQLite adapter, migrations
-ui/                    Operations Console (v4_dashboard.html), Developer Demo (developer_demo.html), Test Suite (test_cases.html)
-ops/                   demo_menu.py interactive CLI
-tests/                 Pytest test suite
-```
-
-## Security Architecture
-
-- **Tenant Isolation:** Every request carries tenant_id from JWT — never from query params
-- **Lease-Based Repairs:** All state changes require time-boxed HMAC-signed leases
-- **Audit Trail:** Every mutation is HMAC-signed and tamper-evident
-- **Defense in Depth:** Auth → Rate Limit → Authz → Lease → Audit → Storage
-- **Network Isolation:** Per-tier network zones enforced at infra level
-
-## Scalability Features
-
-- **Consistent Hashing:** Virtual nodes ensure ~1/N key movement on add/remove
-- **Per-Tenant Queues:** One noisy tenant cannot starve others
-- **Ingress Backpressure:** Per-tier thresholds, early 503 rejection
-- **Read Replicas:** Read traffic offloaded from primary lease-holders
-
-## AI/ML Features
-
-- **Priority Model:** Learned hot-key prediction with safe fallback
-- **Anomaly Detector:** HMAC-verified audit stream analysis, alerts only
-- **Agent Guardrail:** All AI decisions pass through same authz as human actions
-
-## Audit & Testing
-
-- Run `python audit_checklist.py` for 22-file security/architecture audit
-- Run `python audit_checklist.py --json` for structured JSON output
-- Open `test_cases.html` in browser for 27 interactive test cases
-- Run `pytest tests/` for pytest suite
-
-## Build Status
-
-| Domain | Files | Status |
-|--------|-------|--------|
-| Handoff (Core) | tenant, lease, audit_log, gossip_worker, repair_worker, repair_queue, auth, rate_limit, routes, metrics | Complete |
-| Cloud/Infra | topology, storage_adapter, network_policy, region_router, dr_failover | Complete |
-| Scale Depth | shard_router, tenant_queue_pool, ingress_backpressure, read_replica_router | Complete |
-| AI/ML Depth | priority_model, anomaly_detector, agent_guardrail | Complete |
-| **Total** | **22 files + 2 fixes** | **Complete** |
+## 📄 License
+MIT License. Created by [Bhandarihansraj](https://github.com/Bhandarihansraj).
