@@ -119,3 +119,31 @@ async def test_qa_validator(req: AuditLogEntry):
         "diagnostic": diagnostic,
         "verdict": "BAD_DATA_FLAGGED" if is_bad else ("HIGH_RISK" if risk_score > 0.7 else "VERIFIED_OK"),
     }
+
+
+class SemanticAuditSearchRequest(BaseModel):
+    query: str = Field(..., description="Natural language search query")
+    filters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Structured filters (node_id, branch_name, is_bad_data, min_risk)")
+    limit: int = Field(25, ge=1, le=100)
+    min_similarity: float = Field(0.0, ge=0.0, le=1.0)
+
+
+@router.post("/semantic-search")
+async def semantic_search_audit(req: SemanticAuditSearchRequest):
+    """
+    Hybrid semantic vector search over the compliance audit trail.
+    Accepts natural language queries (e.g. 'cross-region poison injections') with relational filters.
+    """
+    return await audit_trail_service.search_semantic(
+        query_text=req.query,
+        filters=req.filters,
+        limit=req.limit,
+        min_similarity=req.min_similarity,
+    )
+
+
+@router.post("/reindex")
+async def reindex_audit_vectors():
+    """Populate or refresh the in-memory audit vector index from SQLite history."""
+    count = await audit_trail_service.reindex_all_from_db()
+    return {"status": "reindexed", "indexed_events": count}

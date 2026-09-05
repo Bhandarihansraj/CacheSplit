@@ -79,6 +79,8 @@ CacheSplit is a distributed caching prototype and simulation engine built with *
 | [`consistent_hash.py`](file:///D:/myonsite/CacheSplit/core/consistent_hash.py) | Hash ring with virtual nodes for partition placement and shard balancing. |
 | [`semantic_cache.py`](file:///D:/myonsite/CacheSplit/core/semantic_cache.py) | AgentDB-inspired vector store with Cosine/Euclidean/Dot metrics, hybrid metadata filters, and MMR. |
 | [`semantic_invalidation.py`](file:///D:/myonsite/CacheSplit/core/semantic_invalidation.py) | Semantic neighborhood invalidator broadcasting cluster invalidations based on distance radius. |
+| [`audit_embedder.py`](file:///D:/myonsite/CacheSplit/core/audit_embedder.py) | Deterministic dense feature & text embedder projecting audit events into 32-D vector space. |
+| [`audit_vector_index.py`](file:///D:/myonsite/CacheSplit/core/audit_vector_index.py) | Hybrid vector index combining Cosine similarity with relational audit filters (`is_bad_data`, `min_risk`). |
 | [`rebac.py`](file:///D:/myonsite/CacheSplit/core/rebac.py) | Relationship-Based Access Control evaluator over relational graph edges. |
 | [`stampede_limiter.py`](file:///D:/myonsite/CacheSplit/core/stampede_limiter.py) | Token-bucket rate limiter preventing upstream origin overload. |
 | [`simulation_engine.py`](file:///D:/myonsite/CacheSplit/core/simulation_engine.py) | Lossy network simulation and convergence engine for cache stampede scenarios. |
@@ -120,6 +122,7 @@ CacheSplit is a distributed caching prototype and simulation engine built with *
 | **Phase 23** | **Git Branching & Audit** | Node branch engine (`commit`, `push`, `pull`, `restore`), Dot indexer, Audit batcher | ✅ Complete |
 | **Phase 24** | **10K+ Scaler & DHCP** | 30,000+ entity seeder, DHCP dynamic addressing, Cross-node permission governance | ✅ Complete |
 | **Phase 25** | **AgentDB Semantic Cache** | Vector indexing (Cosine/Euclidean/Dot), Hybrid metadata filters, MMR diversity, Semantic neighborhood invalidator | ✅ Complete |
+| **Phase 26** | **Hybrid Audit Vector Search** | Dense text & event embedder, hybrid relational search, natural language audit query API & UI | ✅ Complete |
 
 ### 4. API & User Interface (`api/` & `ui/`)
 - **FastAPI Endpoints**: Full CRUD and execution routers mounted in [`api/server.py`](file:///D:/myonsite/CacheSplit/api/server.py).

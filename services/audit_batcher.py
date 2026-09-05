@@ -12,6 +12,7 @@ from typing import Dict, Any, List
 
 from db.database import get_db
 from agents.audit_ml_verifier import audit_verifier
+from core.audit_vector_index import global_audit_vector_index
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +48,14 @@ class AuditBatcher:
             logger.info("AuditBatcher: Background flusher stopped")
 
     async def enqueue(self, event: Dict[str, Any]):
-        """Non-blocking O(1) audit event enqueue."""
+        """Non-blocking O(1) audit event enqueue and vector indexing."""
         self.total_ingested += 1
+        is_bad, risk_score, diagnostic = audit_verifier.validate_and_score(event)
+        enriched_evt = dict(event)
+        enriched_evt["is_bad_data"] = is_bad
+        enriched_evt["risk_score"] = risk_score
+        enriched_evt["diagnostic"] = diagnostic
+        global_audit_vector_index.index_event(enriched_evt)
         await self._queue.put(event)
 
     async def _flush_loop(self):
@@ -77,6 +84,12 @@ class AuditBatcher:
             is_bad, risk_score, diagnostic = audit_verifier.validate_and_score(evt)
             if is_bad:
                 self.total_bad_data += 1
+
+            enriched_evt = dict(evt)
+            enriched_evt["is_bad_data"] = is_bad
+            enriched_evt["risk_score"] = risk_score
+            enriched_evt["diagnostic"] = diagnostic
+            global_audit_vector_index.index_event(enriched_evt)
 
             rows_to_insert.append((
                 evt.get("node_id", "unknown"),

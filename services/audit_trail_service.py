@@ -113,5 +113,71 @@ class AuditTrailService:
             "active_branches": row["active_branches"] or 0,
         }
 
+    async def search_semantic(
+        self,
+        query_text: str,
+        filters: Optional[Dict[str, Any]] = None,
+        limit: int = 25,
+        min_similarity: float = 0.0,
+    ) -> Dict[str, Any]:
+        """
+        Executes hybrid semantic vector search over audit log index.
+        If index is empty, auto-reindexes from DB first.
+        """
+        from core.audit_vector_index import global_audit_vector_index
+
+        if global_audit_vector_index.count == 0:
+            await self.reindex_all_from_db()
+
+        results = global_audit_vector_index.search(
+            query_text=query_text,
+            k=limit,
+            filters=filters,
+            min_similarity=min_similarity,
+        )
+
+        return {
+            "query": query_text,
+            "total_matches": len(results),
+            "indexed_pool_size": global_audit_vector_index.count,
+            "results": results,
+        }
+
+    async def reindex_all_from_db(self, limit: int = 5000) -> int:
+        """
+        Loads recent audit rows from SQLite and populates the in-memory vector index.
+        """
+        from core.audit_vector_index import global_audit_vector_index
+
+        db = get_db()
+        cursor = await db.execute("""
+            SELECT id, node_id, branch_name, developer_id, event_type, entity_id,
+                   payload_json, is_bad_data, risk_score, diagnostic, created_at
+            FROM audit_trail
+            ORDER BY created_at DESC
+            LIMIT ?
+        """, [limit])
+        rows = await cursor.fetchall()
+
+        events = []
+        for r in rows:
+            events.append({
+                "id": r["id"],
+                "node_id": r["node_id"],
+                "branch_name": r["branch_name"],
+                "developer_id": r["developer_id"],
+                "event_type": r["event_type"],
+                "entity_id": r["entity_id"],
+                "data": json.loads(r["payload_json"] or "{}"),
+                "is_bad_data": bool(r["is_bad_data"]),
+                "risk_score": r["risk_score"],
+                "diagnostic": r["diagnostic"],
+                "timestamp": r["created_at"],
+            })
+
+        count = global_audit_vector_index.index_batch(events)
+        logger.info(f"AuditTrailService: Re-indexed {count} audit records into vector space")
+        return count
+
 
 audit_trail_service = AuditTrailService()

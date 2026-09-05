@@ -1192,6 +1192,97 @@ async function injectBadDataAudit() {
   }
 }
 
+function setAuditPreset(query) {
+  const el = document.getElementById('audit-sem-query');
+  if (el) {
+    el.value = query;
+    searchAuditSemantic();
+  }
+}
+
+async function reindexAuditVectors() {
+  try {
+    const res = await API.post('/api/audit/reindex', {});
+    alert(`Audit vectors re-indexed! Total indexed: ${res.indexed_events}`);
+  } catch (e) {
+    alert(`Re-index failed: ${e.message}`);
+  }
+}
+
+async function searchAuditSemantic() {
+  const query = document.getElementById('audit-sem-query').value.trim();
+  const badOnly = document.getElementById('audit-sem-bad-only').checked;
+  const minRisk = parseFloat(document.getElementById('audit-sem-min-risk').value) || 0.0;
+  const limit = parseInt(document.getElementById('audit-sem-limit').value, 10) || 15;
+  const resBox = document.getElementById('audit-semantic-results');
+
+  if (!query) {
+    alert("Please enter a natural language search query");
+    return;
+  }
+
+  resBox.style.display = 'block';
+  resBox.innerHTML = `<div class="text-xs text-muted">Searching audit vector space for: "${query}"...</div>`;
+
+  try {
+    const filters = {};
+    if (badOnly) filters.is_bad_data = true;
+    if (minRisk > 0.0) filters.min_risk = minRisk;
+
+    const res = await API.post('/api/audit/semantic-search', {
+      query: query,
+      filters: filters,
+      limit: limit,
+      min_similarity: 0.0
+    });
+
+    if (!res.results || res.results.length === 0) {
+      resBox.innerHTML = `<div class="text-xs text-muted">No semantic matches found for "${query}". Try re-indexing or loosening filters.</div>`;
+      return;
+    }
+
+    resBox.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:4px;padding:8px;background:var(--surface-2);font-family:var(--font-mono);font-size:11px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <strong>SEMANTIC MATCHES (${res.total_matches} found out of ${res.indexed_pool_size} indexed)</strong>
+          <span style="color:var(--accent);">Query: "${res.query}"</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-top:4px;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border);text-align:left;color:var(--text-muted);">
+              <th style="padding:4px;">Similarity</th>
+              <th style="padding:4px;">Node / Branch</th>
+              <th style="padding:4px;">Event Type</th>
+              <th style="padding:4px;">QA / Risk</th>
+              <th style="padding:4px;">Diagnostic</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${res.results.map(r => `
+              <tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:4px;font-weight:600;color:var(--accent);">${r.similarity}</td>
+                <td style="padding:4px;">${r.event.node_id}:${r.event.branch_name}</td>
+                <td style="padding:4px;">${r.event.event_type}</td>
+                <td style="padding:4px;">
+                  <span class="badge ${r.event.is_bad_data ? 'badge-quarantined' : 'badge-ok'}">
+                    ${r.event.is_bad_data ? 'BAD' : 'OK'}
+                  </span>
+                  <span style="font-weight:600;color:${r.event.risk_score > 0.6 ? 'var(--danger)' : 'inherit'};">
+                    ${r.event.risk_score}
+                  </span>
+                </td>
+                <td style="padding:4px;color:var(--text-muted);">${r.event.diagnostic || '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  } catch (e) {
+    resBox.innerHTML = `<div class="text-xs text-danger">Semantic search failed: ${e.message}</div>`;
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // DHCP Dynamic Discovery & Permissions (Phase 24)
 // ─────────────────────────────────────────────────────────────────────────
