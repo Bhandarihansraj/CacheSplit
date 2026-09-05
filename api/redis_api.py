@@ -1,7 +1,8 @@
 """
 api/redis_api.py
 FastAPI router exposing unified Redis command execution, key inspection,
-TTL expiration management, memory eviction configuration, and store monitoring for CacheSplit.
+TTL expiration management, memory eviction configuration, Pub/Sub messaging,
+and Distributed Redlock Mutex locks for CacheSplit.
 """
 from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, HTTPException, Query
@@ -16,12 +17,15 @@ from core.redis_store import (
     WrongTypeError,
     redis_store,
 )
+from core.redis_pubsub import pubsub_manager
+from core.redlock import redlock_manager
 
 router = APIRouter(prefix="/api/redis", tags=["redis"])
 
 
+# ── Request Models ───────────────────────────────────────────────────────────
 class CommandRequest(BaseModel):
-    cmd: str = Field(..., description="Redis command name, e.g. SET, GET, EXPIRE, TTL, HSET, LPUSH, SADD, ZADD")
+    cmd: str = Field(..., description="Redis command name, e.g. SET, GET, PUBLISH, HSET, LPUSH, SADD, ZADD")
     args: List[Any] = Field(default_factory=list, description="Arguments for the Redis command")
 
 
@@ -35,17 +39,45 @@ class EvictionConfigRequest(BaseModel):
     policy: Optional[str] = Field(default=None, description="Eviction policy (allkeys-lru, volatile-lru, allkeys-lfu, volatile-lfu, volatile-ttl, noeviction, allkeys-random)")
 
 
+class PublishRequest(BaseModel):
+    channel: str = Field(..., description="Channel name to broadcast to")
+    message: Any = Field(..., description="Message payload to send")
+
+
+class SubscribeRequest(BaseModel):
+    subscriber_id: str = Field(..., description="Unique client/subscriber identifier")
+    channels: List[str] = Field(..., description="List of channel names to subscribe to")
+
+
+class PSubscribeRequest(BaseModel):
+    subscriber_id: str = Field(..., description="Unique client/subscriber identifier")
+    patterns: List[str] = Field(..., description="List of glob patterns to subscribe to (e.g. 'news.*')")
+
+
+class LockAcquireRequest(BaseModel):
+    resource: str = Field(..., description="Name of the resource to lock")
+    ttl_ms: int = Field(default=5000, gt=0, description="Lock lease timeout in milliseconds")
+    owner_token: Optional[str] = Field(default=None, description="Optional custom owner token / UUID")
+    retry_times: int = Field(default=0, ge=0, description="Number of retry attempts if lock is held")
+    retry_delay_ms: int = Field(default=50, ge=0, description="Delay between retries in milliseconds")
+
+
+class LockReleaseRequest(BaseModel):
+    resource: str = Field(..., description="Name of the resource to unlock")
+    owner_token: str = Field(..., description="Owner token given during lock acquisition")
+
+
+class LockRenewRequest(BaseModel):
+    resource: str = Field(..., description="Name of the resource to renew")
+    owner_token: str = Field(..., description="Owner token given during lock acquisition")
+    extension_ms: int = Field(default=5000, gt=0, description="Milliseconds to extend lease by")
+
+
+# ── Unified Command Execution ────────────────────────────────────────────────
 @router.post("/command")
 def execute_redis_command(req: CommandRequest) -> Dict[str, Any]:
     """
-    Execute a dynamic Redis-style command against the in-memory RedisStore.
-    Supports: SET, GET, INCR, DECR, MSET, MGET, APPEND, STRLEN,
-              HSET, HMSET, HGET, HGETALL, HDEL, HEXISTS, HKEYS, HVALS, HLEN, HINCRBY,
-              LPUSH, RPUSH, LPOP, RPOP, LRANGE, LLEN, LINDEX, LTRIM,
-              SADD, SMEMBERS, SREM, SISMEMBER, SCARD, SINTER, SUNION, SDIFF,
-              ZADD, ZRANGE, ZREVRANGE, ZRANGEBYSCORE, ZRANK, ZREVRANK, ZSCORE, ZREM, ZCARD, ZCOUNT,
-              EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT, TTL, PTTL, PERSIST,
-              DEL, EXISTS, TYPE, KEYS, FLUSHDB, DBSIZE.
+    Execute a dynamic Redis-style command against the in-memory RedisStore, PubSub, or Redlock.
     """
     cmd = req.cmd.strip().upper()
     args = req.args
@@ -61,7 +93,6 @@ def execute_redis_command(req: CommandRequest) -> Dict[str, Any]:
             ex: Optional[float] = None
             px: Optional[int] = None
 
-            # Parse optional arguments: [NX|XX] [EX seconds|PX milliseconds]
             i = 2
             while i < len(args):
                 opt = str(args[i]).upper()
@@ -429,6 +460,61 @@ def execute_redis_command(req: CommandRequest) -> Dict[str, Any]:
             res = redis_store.zcount(key, min_s, max_s)
             return {"ok": True, "command": cmd, "result": res}
 
+        # ── Pub/Sub Commands ──────────────────────────────────────────────────
+        elif cmd == "PUBLISH":
+            if len(args) != 2:
+                raise RedisError("ERR wrong number of arguments for 'publish' command")
+            res = pubsub_manager.publish(str(args[0]), args[1])
+            return {"ok": True, "command": cmd, "result": res}
+
+        elif cmd == "SUBSCRIBE":
+            if len(args) < 2:
+                raise RedisError("ERR wrong number of arguments for 'subscribe' command (expected subscriber_id, ch1, ...)")
+            sub_id = str(args[0])
+            channels = [str(a) for a in args[1:]]
+            res = pubsub_manager.subscribe(sub_id, *channels)
+            return {"ok": True, "command": cmd, "result": res}
+
+        elif cmd == "PSUBSCRIBE":
+            if len(args) < 2:
+                raise RedisError("ERR wrong number of arguments for 'psubscribe' command (expected subscriber_id, pat1, ...)")
+            sub_id = str(args[0])
+            patterns = [str(a) for a in args[1:]]
+            res = pubsub_manager.psubscribe(sub_id, *patterns)
+            return {"ok": True, "command": cmd, "result": res}
+
+        elif cmd == "PUBSUB":
+            if len(args) < 1:
+                raise RedisError("ERR wrong number of arguments for 'pubsub' command")
+            subcommand = str(args[0]).upper()
+            if subcommand == "CHANNELS":
+                pat = str(args[1]) if len(args) > 1 else "*"
+                res = pubsub_manager.list_channels(pat)
+            elif subcommand == "NUMSUB":
+                chs = [str(a) for a in args[1:]]
+                res = pubsub_manager.numsub(*chs)
+            elif subcommand == "NUMPAT":
+                res = pubsub_manager.numpat()
+            else:
+                raise RedisError(f"ERR unknown pubsub subcommand '{subcommand}'")
+            return {"ok": True, "command": f"PUBSUB {subcommand}", "result": res}
+
+        # ── Redlock Commands ──────────────────────────────────────────────────
+        elif cmd in ("LOCK.ACQUIRE", "LOCK_ACQUIRE"):
+            if len(args) < 1:
+                raise RedisError("ERR wrong number of arguments for lock acquire")
+            resource = str(args[0])
+            ttl_ms = int(args[1]) if len(args) > 1 else 5000
+            owner = str(args[2]) if len(args) > 2 else None
+            token = redlock_manager.acquire(resource, ttl_ms=ttl_ms, owner_token=owner)
+            return {"ok": bool(token), "command": cmd, "result": token}
+
+        elif cmd in ("LOCK.RELEASE", "LOCK_RELEASE"):
+            if len(args) != 2:
+                raise RedisError("ERR wrong number of arguments for lock release (expected resource, owner_token)")
+            res = redlock_manager.release(str(args[0]), str(args[1]))
+            return {"ok": res, "command": cmd, "result": 1 if res else 0}
+
         # ── Generic Keys ─────────────────────────────────────────────────────
         elif cmd == "DEL":
             if len(args) < 1:
@@ -476,6 +562,7 @@ def execute_redis_command(req: CommandRequest) -> Dict[str, Any]:
         return {"ok": False, "command": cmd, "error": f"ERR {str(e)}", "error_type": "INTERNAL"}
 
 
+# ── TTL Endpoints ────────────────────────────────────────────────────────────
 @router.post("/expire")
 def set_key_expiration(req: ExpireRequest) -> Dict[str, Any]:
     """Set Time-To-Live expiration on a key."""
@@ -519,6 +606,101 @@ def configure_eviction(req: EvictionConfigRequest) -> Dict[str, Any]:
         raise HTTPException(status_code=400, detail=str(e))
 
 
+# ── Pub/Sub Endpoints ────────────────────────────────────────────────────────
+@router.post("/publish")
+def publish_message(req: PublishRequest) -> Dict[str, Any]:
+    """Publish a message to a channel."""
+    delivered = pubsub_manager.publish(req.channel, req.message)
+    return {"ok": True, "channel": req.channel, "receivers": delivered}
+
+
+@router.post("/subscribe")
+def subscribe_channels(req: SubscribeRequest) -> Dict[str, Any]:
+    """Subscribe a client to one or more channels."""
+    res = pubsub_manager.subscribe(req.subscriber_id, *req.channels)
+    return {"ok": True, "subscriber_id": req.subscriber_id, "subscriptions": res}
+
+
+@router.post("/psubscribe")
+def psubscribe_patterns(req: PSubscribeRequest) -> Dict[str, Any]:
+    """Subscribe a client to one or more patterns (e.g. 'news.*')."""
+    res = pubsub_manager.psubscribe(req.subscriber_id, *req.patterns)
+    return {"ok": True, "subscriber_id": req.subscriber_id, "patterns": res}
+
+
+@router.get("/messages/{subscriber_id}")
+def poll_messages(subscriber_id: str, count: int = Query(100, ge=1, le=1000)) -> Dict[str, Any]:
+    """Poll pending delivered messages for a subscriber."""
+    messages = pubsub_manager.poll(subscriber_id, count=count)
+    return {"subscriber_id": subscriber_id, "count": len(messages), "messages": messages}
+
+
+@router.get("/pubsub/channels")
+def list_pubsub_channels(pattern: str = Query("*")) -> Dict[str, Any]:
+    """List active pub/sub channels."""
+    channels = pubsub_manager.list_channels(pattern)
+    return {"pattern": pattern, "channels": channels}
+
+
+@router.get("/pubsub/stats")
+def get_pubsub_stats() -> Dict[str, Any]:
+    """Get Pub/Sub operational metrics."""
+    return pubsub_manager.stats()
+
+
+# ── Redlock Distributed Lock Endpoints ───────────────────────────────────────
+@router.post("/lock/acquire")
+def acquire_lock(req: LockAcquireRequest) -> Dict[str, Any]:
+    """Acquire a distributed mutex lock on a resource."""
+    token = redlock_manager.acquire(
+        resource=req.resource,
+        ttl_ms=req.ttl_ms,
+        owner_token=req.owner_token,
+        retry_times=req.retry_times,
+        retry_delay_ms=req.retry_delay_ms,
+    )
+    if not token:
+        return {"ok": False, "resource": req.resource, "error": "Lock is currently held by another client"}
+    return {"ok": True, "resource": req.resource, "owner_token": token, "ttl_ms": req.ttl_ms}
+
+
+@router.post("/lock/release")
+def release_lock(req: LockReleaseRequest) -> Dict[str, Any]:
+    """Release a distributed mutex lock using the owner token."""
+    released = redlock_manager.release(req.resource, req.owner_token)
+    return {"ok": released, "resource": req.resource, "released": released}
+
+
+@router.post("/lock/renew")
+def renew_lock(req: LockRenewRequest) -> Dict[str, Any]:
+    """Renew/extend lease time on an active lock."""
+    renewed = redlock_manager.renew(req.resource, req.owner_token, req.extension_ms)
+    return {"ok": renewed, "resource": req.resource, "renewed": renewed}
+
+
+@router.get("/lock/info/{resource}")
+def get_lock_info(resource: str) -> Dict[str, Any]:
+    """Get status and remaining lease time for a locked resource."""
+    info = redlock_manager.get_lock_info(resource)
+    if not info:
+        return {"resource": resource, "locked": False}
+    return {"resource": resource, "locked": True, "info": info}
+
+
+@router.get("/lock/list")
+def list_active_locks() -> Dict[str, Any]:
+    """List all currently active distributed locks."""
+    locks = redlock_manager.list_active_locks()
+    return {"count": len(locks), "locks": locks}
+
+
+@router.get("/lock/stats")
+def get_lock_stats() -> Dict[str, Any]:
+    """Get distributed lock coordinator stats."""
+    return redlock_manager.stats()
+
+
+# ── Key Query & Inspection Endpoints ────────────────────────────────────────
 @router.get("/keys")
 def list_keys(pattern: str = Query("*", description="Glob pattern matching keys")) -> Dict[str, Any]:
     """Retrieve keys matching a pattern with their type, size, and TTL."""
