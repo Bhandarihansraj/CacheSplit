@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS commit_log (
     entity_ids TEXT NOT NULL DEFAULT '[]',
     mutations_json TEXT NOT NULL DEFAULT '{}',
     merkle_roots_json TEXT NOT NULL DEFAULT '{}',
-    created_at REAL NOT NULL
+    created_at REAL NOT NULL,
+    sync_status TEXT NOT NULL DEFAULT 'pending'
 );
 
 CREATE TABLE IF NOT EXISTS entity_cache (
@@ -102,6 +103,11 @@ async def init_db(db_path: Optional[str] = None) -> aiosqlite.Connection:
         await _db.execute("ALTER TABLE commit_log ADD COLUMN hashable_json TEXT NOT NULL DEFAULT ''")
     except Exception:
         pass  # column already exists
+
+    try:
+        await _db.execute("ALTER TABLE commit_log ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'")
+    except Exception:
+        pass
 
     try:
         await _db.execute("ALTER TABLE nodes ADD COLUMN handshake_status TEXT NOT NULL DEFAULT 'pending'")

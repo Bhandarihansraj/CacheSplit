@@ -24,7 +24,10 @@ from api.propagation import router as propagation_router
 from api.users import router as users_router
 from api.payments import router as payments_router
 from api.scanner import router as scanner_router
+from api.developer import router as developer_router
 from services.sync_loop import sync_loop
+from services.raft_node import raft_node
+from services.write_behind import write_behind
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger(__name__)
@@ -67,10 +70,14 @@ async def lifespan(app: FastAPI):
     # Start background health sweep + auto-heartbeat emitter
     registry.start_sweep(enable_auto_heartbeat=True)
     sync_loop.start()
+    raft_node.start()
+    write_behind.start()
     logger.info("CacheSplit v3 ready — http://127.0.0.1:8000")
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
+    write_behind.stop()
+    raft_node.stop()
     sync_loop.stop()
     registry.stop_sweep()
     await close_db()
@@ -93,6 +100,7 @@ app.include_router(propagation_router)
 app.include_router(users_router)
 app.include_router(payments_router)
 app.include_router(scanner_router)
+app.include_router(developer_router)
 
 
 # ──────────────────────── Core API Routes ────────────────────────────────────
@@ -116,6 +124,26 @@ async def heartbeat(req: HeartbeatRequest):
         req.node_id, time.time(), req.version_number, req.current_commit_hash
     )
     return {"status": "ok"}
+
+
+class RaftRequestVote(BaseModel):
+    term: int
+    candidate_id: str
+    last_log_index: int
+    last_log_term: int
+
+@app.post("/api/raft/request-vote")
+async def raft_request_vote(req: RaftRequestVote):
+    return raft_node.handle_request_vote(req.term, req.candidate_id, req.last_log_index, req.last_log_term)
+
+
+class RaftHeartbeat(BaseModel):
+    term: int
+    leader_id: str
+
+@app.post("/api/raft/heartbeat")
+async def raft_heartbeat(req: RaftHeartbeat):
+    return raft_node.handle_heartbeat(req.term, req.leader_id)
 
 
 class HandshakeRequest(BaseModel):
@@ -151,6 +179,17 @@ async def debug_quarantine(node_id: str, reason: str):
     await node_repo.update_node_health(node_id, "quarantined", flags)
     return {"status": "quarantined", "node_id": node_id}
 
+
+from core.consistent_hash import HashRing
+
+@app.get("/api/sharding/locate/{entity_id}")
+async def locate_entity(entity_id: str):
+    nodes = list(registry.nodes.keys())
+    if not nodes:
+        return {"entity_id": entity_id, "node_id": None}
+    ring = HashRing(nodes)
+    node = ring.get_node(entity_id)
+    return {"entity_id": entity_id, "node_id": node}
 
 @app.websocket("/api/ws/state")
 async def websocket_endpoint(websocket: WebSocket):

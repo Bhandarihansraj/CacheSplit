@@ -17,6 +17,7 @@ class NodeStatus(BaseModel):
     heartbeat_enabled: bool = True
     handshake_status: Literal["pending", "approved", "rejected"] = "pending"
     join_token: str = ""
+    endpoint_url: str = "http://127.0.0.1:8000"
 
 class NodeRegistry:
     MINIMUM_NODE_VERSION = 3

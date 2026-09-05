@@ -675,6 +675,21 @@ function confirmAction(message, onConfirm) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// DEVELOPER PORTAL
+// ─────────────────────────────────────────────────────────────────────────
+async function generateApiKey() {
+  const resultEl = document.getElementById('dev-api-key-result');
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = `<div class="spinner"></div> Generating…`;
+  try {
+    const data = await API.post('/api/dev/keys', {});
+    resultEl.innerHTML = `<strong>API Key:</strong><br><span style="color:var(--accent-2)">${data.api_key}</span><br><br><span class="text-xs text-muted">Copy this key, it will not be shown again.</span>`;
+  } catch (e) {
+    resultEl.innerHTML = `<span style="color:var(--danger)">Failed to generate key: ${e.message}</span>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // NODE CRUD
 // ─────────────────────────────────────────────────────────────────────────
 function toggleAddNodePanel() {

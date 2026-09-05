@@ -40,6 +40,12 @@
         </svg>
         Scanner
       </div>
+      <div class="nav-item" data-page="page-developer" data-label="Developer Portal">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M4 6L2 8L4 10M12 6L14 8L12 10M9 4L7 12"/>
+        </svg>
+        Developer Portal
+      </div>
     </div>
 
     <div class="nav-section">
@@ -428,6 +434,52 @@
             <div id="security-feed" class="scroll-panel" style="padding:8px 12px">
               <div class="state-msg"><div class="spinner"></div><span>Loading…</span></div>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Page: Developer Portal ──────────────────────────────── -->
+    <div class="page" id="page-developer">
+      <div class="section-header">
+        <div>
+          <h2>Developer Portal</h2>
+          <p>Generate API keys and connect your direct DB code to CacheSplit using unified JSON ops.</p>
+        </div>
+      </div>
+      
+      <div class="grid-2">
+        <!-- API Keys -->
+        <div class="card">
+          <div class="card-header">
+            <h3>API Keys</h3>
+          </div>
+          <div class="card-body">
+            <p class="text-sm text-muted mb-12">Generate a live API key for your applications to connect securely.</p>
+            <button class="btn btn-primary" onclick="generateApiKey()">Generate New Key</button>
+            <div id="dev-api-key-result" class="mt-12" style="font-family: monospace; background: var(--surface-2); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border); display: none;"></div>
+          </div>
+        </div>
+
+        <!-- Connection Snippets -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Quickstart Connection</h3>
+          </div>
+          <div class="card-body">
+            <p class="text-sm text-muted mb-8">Send unified compound commit payloads directly to CacheSplit:</p>
+            <div class="scroll-panel" style="background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); padding:12px; font-family:monospace; font-size:12px; white-space:pre-wrap;">curl -X POST "http://localhost:8000/api/dev/ops" \\
+     -H "Authorization: Bearer &lt;YOUR_API_KEY&gt;" \\
+     -H "Content-Type: application/json" \\
+     -d '{
+  "mutations": [
+    {
+      "entity_id": "pat_us_east_999",
+      "entity_type": "patient",
+      "data": {"status": "admitted"}
+    }
+  ]
+}'</div>
           </div>
         </div>
       </div>
