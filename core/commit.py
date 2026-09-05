@@ -3,11 +3,13 @@ from typing import Optional, Any
 import time
 import json
 
+import os
 from core.hash_chain import generate_signed_hash, verify_signed_hash
 
-# Single shared origin key for the dev/demo deployment. In production this comes
-# from a secrets manager (ops/secrets.py) and is never stored in code.
-ORIGIN_SIGNING_KEY = "cachesplit-dev-origin-key"
+# Loaded from environment. Set CACHESPLIT_SIGNING_KEY in production.
+# Falls back to a local dev default — never deploy the default to production.
+ORIGIN_SIGNING_KEY = os.getenv("CACHESPLIT_SIGNING_KEY", "cachesplit-dev-key")
+
 
 class Commit(BaseModel):
     commit_hash: str = ""

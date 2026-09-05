@@ -89,7 +89,8 @@ app = FastAPI(title="CacheSplit v3", version="3.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,   # Fixed: True + wildcard origin = OWASP CORS-01
+
     allow_methods=["*"],
     allow_headers=["*"],
 )

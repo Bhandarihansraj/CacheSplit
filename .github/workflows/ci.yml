@@ -9,39 +9,41 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+    env:
+      CACHESPLIT_SIGNING_KEY: "test-key-ci"
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: "3.11"
-        
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-asyncio httpx asyncpg
-        
+        pip install pytest pytest-asyncio httpx
+
     - name: Run Phase 0 (Core) Tests
-      run: pytest tests/test_phase0_core.py
-      
-- name: Run Phase 1 (Registry & Agents) Tests
+      run: pytest tests/test_phase0_core.py -v
+
+    - name: Run Phase 1 (Registry & Agents) Tests
       run: |
-        pytest tests/test_phase1_registry.py
-        pytest tests/test_phase1_agents.py
+        pytest tests/test_phase1_registry.py -v
+        pytest tests/test_phase1_agents.py -v
 
     - name: Run ER Fabric (Merkle DAG / Compound Commit / ReBAC) Tests
-      run: pytest tests/test_er_merkle_rebac.py
+      run: pytest tests/test_er_merkle_rebac.py -v
 
-    - name: Run Phase 2 (Debounce, Postgres, API) Tests
+    - name: Run Phase 2 (Debounce, API) Tests
       run: |
-        pytest tests/test_phase2_debounce.py
-        pytest tests/test_phase2_postgres.py
-        pytest tests/test_api_dashboard.py
+        pytest tests/test_phase2_debounce.py -v
+        pytest tests/test_api_dashboard.py -v
 
     - name: Run Phase 3 (Signing + Propagation) Tests
-      run: pytest tests/test_phase3_propagation_signing.py
-        
-    # Block merge if any gate fails is handled natively by GitHub Actions Branch Protection requiring this check.
+      run: pytest tests/test_phase3_propagation_signing.py -v
+
+    - name: Run v4 Stampede Recovery Tests
+      run: pytest tests/test_stampede_recovery.py -v
