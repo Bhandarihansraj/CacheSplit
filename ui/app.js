@@ -833,8 +833,29 @@ function startPolling() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// PAGE 7 — DEVELOPER PORTAL
+// ─────────────────────────────────────────────────────────────────────────
+async function generateApiKey() {
+  const resultEl = document.getElementById('dev-api-key-result');
+  if (!resultEl) return;
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = '<div class="spinner"></div> Generating key...';
+  try {
+    const res = await API.post('/api/dev/keys');
+    if (res.api_key) {
+      resultEl.innerHTML = `<strong>Live Key Generated:</strong><br><span style="color:var(--accent); font-weight:600;">${res.api_key}</span><br><span class="text-xs text-muted">Use this in the Authorization: Bearer header</span>`;
+    } else {
+      resultEl.innerHTML = `<span style="color:var(--danger);">Error: ${JSON.stringify(res)}</span>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<span style="color:var(--danger);">Failed: ${e.message}</span>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // PAGE 8 — STAMPEDE SIMULATOR (v4)
 // ─────────────────────────────────────────────────────────────────────────
+
 async function pollSimSnapshot() {
   const activePage = document.querySelector('.page.active')?.id;
   if (activePage !== 'page-simulator') return;

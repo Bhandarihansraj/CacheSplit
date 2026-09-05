@@ -10,6 +10,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
+      PYTHONPATH: "."
       CACHESPLIT_SIGNING_KEY: "test-key-ci"
 
     steps:
