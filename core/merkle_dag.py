@@ -38,6 +38,19 @@ class MerkleDAG:
         # Reverse edges: target_id -> list of (relation, source_id)
         self.reverse_edges: Dict[str, List[tuple[str, str]]] = {}
 
+    def get_entity(self, entity_id: str) -> Optional[EntityNode]:
+        return self.entities.get(entity_id)
+
+    def compute_root_hash(self) -> str:
+        """Compute the combined Merkle root hash across all root entities in the DAG."""
+        if not self.entities:
+            return "genesis"
+        root_nodes = [e.entity_id for e in self.entities.values() if not e.parent_id]
+        if not root_nodes:
+            root_nodes = list(self.entities.keys())
+        hashes = [self.compute_merkle_root(r_id) for r_id in sorted(root_nodes)]
+        return hashlib.sha256("".join(hashes).encode("utf-8")).hexdigest()
+
     def add_entity(self, entity: EntityNode):
         entity.compute_local_hash()
         self.entities[entity.entity_id] = entity
@@ -45,6 +58,7 @@ class MerkleDAG:
             self.edges[entity.entity_id] = []
         if entity.entity_id not in self.reverse_edges:
             self.reverse_edges[entity.entity_id] = []
+
 
     def add_edge(self, source_id: str, relation: str, target_id: str):
         if source_id not in self.edges:

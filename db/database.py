@@ -76,12 +76,41 @@ CREATE TABLE IF NOT EXISTS rebac_edges (
     UNIQUE(source_id, relation, target_id)
 );
 
+CREATE TABLE IF NOT EXISTS audit_trail (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id TEXT NOT NULL,
+    branch_name TEXT NOT NULL DEFAULT 'main',
+    developer_id TEXT NOT NULL DEFAULT 'system',
+    event_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL DEFAULT '',
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    is_bad_data INTEGER NOT NULL DEFAULT 0,
+    risk_score REAL NOT NULL DEFAULT 0.0,
+    diagnostic TEXT NOT NULL DEFAULT '',
+    created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS branches (
+    branch_name TEXT NOT NULL,
+    node_id TEXT NOT NULL,
+    head_commit_id TEXT,
+    merkle_root TEXT NOT NULL,
+    developer_id TEXT NOT NULL,
+    parent_branch TEXT NOT NULL DEFAULT 'main',
+    created_at REAL NOT NULL,
+    PRIMARY KEY (node_id, branch_name)
+);
+
 CREATE INDEX IF NOT EXISTS idx_entity_node ON entity_cache(node_id);
 CREATE INDEX IF NOT EXISTS idx_entity_parent ON entity_cache(parent_id);
 CREATE INDEX IF NOT EXISTS idx_rebac_source ON rebac_edges(source_id);
 CREATE INDEX IF NOT EXISTS idx_rebac_target ON rebac_edges(target_id);
 CREATE INDEX IF NOT EXISTS idx_commit_created ON commit_log(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_security_created ON security_events(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_node_created ON audit_trail(node_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_branch ON audit_trail(branch_name);
+CREATE INDEX IF NOT EXISTS idx_audit_bad_data ON audit_trail(is_bad_data);
+
 """
 
 

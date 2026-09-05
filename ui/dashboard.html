@@ -80,6 +80,22 @@
         </svg>
         Access Control
       </div>
+      <div class="nav-item" data-page="page-branches" data-label="Git Branch Manager">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="4" cy="4" r="2"/>
+          <circle cx="4" cy="12" r="2"/>
+          <circle cx="12" cy="7" r="2"/>
+          <path d="M4 6V10M4 6C4 7 6 7 8 7H10"/>
+        </svg>
+        Branch Ops
+      </div>
+      <div class="nav-item" data-page="page-audit" data-label="Compliance Audit Trail">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/>
+          <path d="M9 2v4h4M6 9h4M6 12h4"/>
+        </svg>
+        Audit Trail
+      </div>
       <div class="nav-item" data-page="page-security" data-label="Security">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M8 2L13 4V9C13 12 8 14 8 14S3 12 3 9V4L8 2Z"/>
@@ -87,6 +103,7 @@
         Security
       </div>
     </div>
+
 
     <div class="sidebar-footer">
       <div class="status-pill">
@@ -551,9 +568,129 @@
           </div>
         </div>
       </div>
+    <!-- ── Page: Git Branch Manager ───────────────────────────── -->
+    <div id="page-branches" class="page">
+      <div class="section-header">
+        <div>
+          <h2>Git-Style Node Branch Manager & Dot Indexer</h2>
+          <p>Multi-developer branch isolation, commits, pull, push, restore rollback, and zero-cost O(1) dot-path indexing.</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary btn-sm" onclick="createBranchPrompt()">+ New Branch</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadNodeBranches()">Refresh Branches</button>
+        </div>
+      </div>
+
+      <div class="grid-2 mb-16">
+        <!-- Branch Selector & Git Ops -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Active Node & Branch</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group mb-8">
+              <label>Target Node</label>
+              <select id="branch-node-select" onchange="loadNodeBranches()">
+                <option value="us-east-1">us-east-1 (US-East)</option>
+                <option value="eu-west-1">eu-west-1 (EU-West)</option>
+                <option value="asia-south-1">asia-south-1 (Asia-South)</option>
+              </select>
+            </div>
+            <div class="form-group mb-12">
+              <label>Current Branch</label>
+              <select id="branch-active-select" onchange="switchBranchView()">
+                <option value="main">main (Head)</option>
+              </select>
+            </div>
+            <div class="btn-group mb-12">
+              <button class="btn btn-primary btn-sm" onclick="commitBranchModal()">Commit</button>
+              <button class="btn btn-ghost btn-sm" onclick="pushActiveBranch()">Push to Main</button>
+              <button class="btn btn-ghost btn-sm" onclick="pullActiveBranch()">Pull from Main</button>
+              <button class="btn btn-danger btn-sm" onclick="restoreBranchModal()">Restore State</button>
+            </div>
+            <div id="branch-op-result" class="scroll-panel" style="font-family:monospace; font-size:11px; background:var(--surface-2); padding:10px; border-radius:var(--radius-sm); border:1px solid var(--border); display:none;"></div>
+          </div>
+        </div>
+
+        <!-- Dot Indexer Query -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Hierarchical Dot Index Resolver</h3>
+          </div>
+          <div class="card-body">
+            <p class="text-xs text-muted mb-8">Query direct dot-notation paths across nodes, branches, and entities:</p>
+            <div class="form-group mb-8">
+              <input id="dot-path-input" value="nodes.us-east-1.branches.main.merkle_root" placeholder="e.g. nodes.us-east-1.branches.main.merkle_root">
+            </div>
+            <button class="btn btn-primary btn-sm mb-12" onclick="resolveDotPath()">Resolve Dot Path</button>
+            <div id="dot-resolve-result" class="scroll-panel" style="font-family:monospace; font-size:11px; background:#18180F; color:#A8E6CF; padding:10px; border-radius:var(--radius-sm); max-height:160px;">// Dot path resolution appears here</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Branch Commit History -->
+      <div class="card">
+        <div class="card-header">
+          <h3>Branch Commit History & Merkle Diff</h3>
+        </div>
+        <div class="card-body">
+          <div id="branch-history-container" class="scroll-panel" style="max-height:220px; font-family:monospace; font-size:12px;">
+            <div class="text-xs text-muted">Loading branch history...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Page: Compliance Audit Trail ────────────────────────── -->
+    <div id="page-audit" class="page">
+      <div class="section-header">
+        <div>
+          <h2>High-Throughput Audit Trail & QA Verifier</h2>
+          <p>Micro-batch vectorized log ingestion, QA structural bad-data filters, and Isolation Forest ML risk scores.</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary btn-sm" onclick="loadAuditTrail()">Refresh Audit Log</button>
+          <button class="btn btn-danger btn-sm" onclick="injectBadDataAudit()">Inject QA Bad Data</button>
+        </div>
+      </div>
+
+      <div class="grid-4 mb-16">
+        <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+          <div class="text-xs text-muted">TOTAL AUDIT EVENTS</div>
+          <div id="audit-stat-total" style="font-weight:600; font-size:18px; margin-top:4px;">0</div>
+        </div>
+        <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+          <div class="text-xs text-muted">QA BAD DATA DETECTED</div>
+          <div id="audit-stat-bad" style="font-weight:600; font-size:18px; color:var(--danger); margin-top:4px;">0</div>
+        </div>
+        <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+          <div class="text-xs text-muted">AVERAGE ML RISK SCORE</div>
+          <div id="audit-stat-risk" style="font-weight:600; font-size:18px; margin-top:4px;">0.00</div>
+        </div>
+        <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+          <div class="text-xs text-muted">BATCH BUFFER DEPTH</div>
+          <div id="audit-stat-buffer" style="font-weight:600; font-size:18px; color:var(--accent); margin-top:4px;">0</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Immutable Audit Trail Log</h3>
+          <div class="btn-group">
+            <button class="btn btn-ghost btn-sm" onclick="filterAuditBadData(false)">All Logs</button>
+            <button class="btn btn-ghost btn-sm" onclick="filterAuditBadData(true)">Flagged QA Bad Data Only</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="audit-table-container" class="scroll-panel" style="max-height:360px;">
+            <div class="text-xs text-muted">Loading audit events...</div>
+          </div>
+        </div>
+      </div>
     </div>
 
   </div><!-- /main-content -->
+
 
 </div><!-- /layout -->
 

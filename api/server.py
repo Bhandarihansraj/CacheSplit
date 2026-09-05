@@ -26,6 +26,9 @@ from api.payments import router as payments_router
 from api.scanner import router as scanner_router
 from api.developer import router as developer_router
 from api.simulation import router as simulation_router
+from api.branches import router as branch_router, dot_router
+from api.audit import router as audit_router
+from services.audit_batcher import audit_batcher
 from services.sync_loop import sync_loop
 from services.raft_node import raft_node
 from services.write_behind import write_behind
@@ -69,15 +72,17 @@ async def lifespan(app: FastAPI):
             n["version_number"], {},
         )
 
-    # Start background health sweep + auto-heartbeat emitter
+    # Start background health sweep + auto-heartbeat emitter + workers
     registry.start_sweep(enable_auto_heartbeat=True)
     sync_loop.start()
     raft_node.start()
     write_behind.start()
-    logger.info("CacheSplit v3 ready — http://127.0.0.1:8000")
+    audit_batcher.start()
+    logger.info("CacheSplit v4 ready — http://127.0.0.1:8000")
     yield
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
+    audit_batcher.stop()
     write_behind.stop()
     raft_node.stop()
     sync_loop.stop()
@@ -86,7 +91,7 @@ async def lifespan(app: FastAPI):
     logger.info("Server shutdown complete.")
 
 
-app = FastAPI(title="CacheSplit v3", version="3.0.0", lifespan=lifespan)
+app = FastAPI(title="CacheSplit v4", version="4.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -105,6 +110,10 @@ app.include_router(payments_router)
 app.include_router(scanner_router)
 app.include_router(developer_router)
 app.include_router(simulation_router)
+app.include_router(branch_router)
+app.include_router(dot_router)
+app.include_router(audit_router)
+
 
 
 # ──────────────────────── Core API Routes ────────────────────────────────────

@@ -942,6 +942,257 @@ async function stepSimRecovery() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// PAGE 9 — GIT BRANCH MANAGER & DOT INDEXER
+// ─────────────────────────────────────────────────────────────────────────
+async function loadNodeBranches() {
+  const nodeId = document.getElementById('branch-node-select')?.value || 'us-east-1';
+  try {
+    const data = await API.get(`/api/branch/list/${nodeId}`);
+    const sel = document.getElementById('branch-active-select');
+    if (sel) {
+      sel.innerHTML = '';
+      (data.branches || []).forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.branch_name;
+        opt.textContent = `${b.branch_name} (${b.commit_count} commits, Root: ${b.merkle_root.slice(0, 8)}...)`;
+        sel.appendChild(opt);
+      });
+    }
+    await switchBranchView();
+  } catch (e) {
+    console.error('Error in loadNodeBranches:', e);
+  }
+}
+
+async function switchBranchView() {
+  const nodeId = document.getElementById('branch-node-select')?.value || 'us-east-1';
+  const branchName = document.getElementById('branch-active-select')?.value || 'main';
+  const container = document.getElementById('branch-history-container');
+  if (!container) return;
+  try {
+    const data = await API.get(`/api/branch/log/${nodeId}/${encodeURIComponent(branchName)}`);
+    if (!data.log || !data.log.length) {
+      container.innerHTML = `<div class="text-xs text-muted">No commits yet on branch '${branchName}'.</div>`;
+      return;
+    }
+    container.innerHTML = data.log.map(c => `
+      <div style="border-bottom:1px solid var(--border); padding:8px 0;">
+        <div class="flex justify-between">
+          <strong>${c.commit_id}</strong>
+          <span class="text-muted text-xs">${new Date(c.timestamp * 1000).toLocaleTimeString()}</span>
+        </div>
+        <div>${c.message} <span class="text-muted text-xs">(by ${c.developer_id})</span></div>
+        <div class="text-xs text-muted">Merkle Root: ${c.merkle_root}</div>
+      </div>
+    `).join('');
+  } catch (e) {
+    container.innerHTML = `<div class="text-xs state-error">Failed to load log: ${e.message}</div>`;
+  }
+}
+
+async function createBranchPrompt() {
+  const nodeId = document.getElementById('branch-node-select')?.value || 'us-east-1';
+  const branchName = prompt("Enter new branch name (e.g. dev/feature-login):");
+  if (!branchName) return;
+  const devId = prompt("Enter developer ID:", "developer-1") || "developer-1";
+  try {
+    const res = await API.post('/api/branch/create', {
+      node_id: nodeId,
+      branch_name: branchName,
+      developer_id: devId,
+      from_branch: document.getElementById('branch-active-select')?.value || 'main',
+    });
+    alert(`Branch '${branchName}' created successfully!`);
+    await loadNodeBranches();
+  } catch (e) {
+    alert(`Failed to create branch: ${e.message}`);
+  }
+}
+
+async function commitBranchModal() {
+  const nodeId = document.getElementById('branch-node-select')?.value || 'us-east-1';
+  const branchName = document.getElementById('branch-active-select')?.value || 'main';
+  const entityId = prompt("Enter Entity ID to mutate on this branch:", "pat_us_east_001");
+  if (!entityId) return;
+  const msg = prompt("Enter commit message:", "Branch feature update") || "Branch feature update";
+  try {
+    const res = await API.post('/api/branch/commit', {
+      node_id: nodeId,
+      branch_name: branchName,
+      developer_id: "dev-user",
+      message: msg,
+      mutations: [{ entity_id: entityId, entity_type: "patient", data: { status: "branch-updated", timestamp: Date.now() } }],
+      edges: []
+    });
+    const resultBox = document.getElementById('branch-op-result');
+    if (resultBox) {
+      resultBox.style.display = 'block';
+      resultBox.textContent = `✅ Committed ${res.commit_id}\nNew Merkle Root: ${res.merkle_root}`;
+    }
+    await switchBranchView();
+  } catch (e) {
+    alert(`Commit failed: ${e.message}`);
+  }
+}
+
+async function pushActiveBranch() {
+  const nodeId = document.getElementById('branch-node-select')?.value || 'us-east-1';
+  const branchName = document.getElementById('branch-active-select')?.value || 'main';
+  if (branchName === 'main') {
+    alert("Active branch is already 'main'. Select a feature branch to push into main.");
+    return;
+  }
+  try {
+    const res = await API.post('/api/branch/push', {
+      node_id: nodeId,
+      source_branch: branchName,
+      target_branch: 'main',
+    });
+    alert(`✅ Successfully pushed '${branchName}' into 'main'!\nCommit: ${res.commit_id}`);
+    await loadNodeBranches();
+  } catch (e) {
+    alert(`Push failed: ${e.message}`);
+  }
+}
+
+async function pullActiveBranch() {
+  const nodeId = document.getElementById('branch-node-select')?.value || 'us-east-1';
+  const branchName = document.getElementById('branch-active-select')?.value || 'main';
+  try {
+    const res = await API.post('/api/branch/pull', {
+      node_id: nodeId,
+      branch_name: branchName,
+      from_branch: 'main',
+    });
+    alert(`✅ Successfully pulled from 'main' into '${branchName}'!`);
+    await switchBranchView();
+  } catch (e) {
+    alert(`Pull failed: ${e.message}`);
+  }
+}
+
+async function restoreBranchModal() {
+  const nodeId = document.getElementById('branch-node-select')?.value || 'us-east-1';
+  const branchName = document.getElementById('branch-active-select')?.value || 'main';
+  const commitId = prompt("Enter Commit ID to restore/rollback this branch to:");
+  if (!commitId) return;
+  try {
+    const res = await API.post('/api/branch/restore', {
+      node_id: nodeId,
+      branch_name: branchName,
+      commit_id: commitId,
+    });
+    alert(`✅ Restored '${branchName}' to commit ${commitId}!`);
+    await switchBranchView();
+  } catch (e) {
+    alert(`Restore failed: ${e.message}`);
+  }
+}
+
+async function resolveDotPath() {
+  const path = document.getElementById('dot-path-input')?.value.trim();
+  const box = document.getElementById('dot-resolve-result');
+  if (!path || !box) return;
+  box.textContent = "Resolving dot path...";
+  try {
+    const res = await API.get(`/api/dot/resolve?path=${encodeURIComponent(path)}`);
+    box.textContent = JSON.stringify(res, null, 2);
+  } catch (e) {
+    box.textContent = `Error: ${e.message}`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PAGE 10 — COMPLIANCE AUDIT TRAIL & QA VERIFIER
+// ─────────────────────────────────────────────────────────────────────────
+let _auditBadDataOnly = false;
+
+function filterAuditBadData(badOnly) {
+  _auditBadDataOnly = badOnly;
+  loadAuditTrail();
+}
+
+async function loadAuditTrail() {
+  try {
+    const statsRes = await API.get('/api/audit/stats');
+    if (statsRes.trail_summary) {
+      document.getElementById('audit-stat-total').textContent = statsRes.trail_summary.total_audit_events || 0;
+      document.getElementById('audit-stat-bad').textContent = statsRes.trail_summary.bad_data_events || 0;
+      document.getElementById('audit-stat-risk').textContent = statsRes.trail_summary.average_risk_score || "0.00";
+    }
+    if (statsRes.batch_buffer) {
+      document.getElementById('audit-stat-buffer').textContent = statsRes.batch_buffer.queue_depth || 0;
+    }
+
+    const url = _auditBadDataOnly ? '/api/audit/trail?is_bad_data=true&limit=50' : '/api/audit/trail?limit=50';
+    const trailRes = await API.get(url);
+    const container = document.getElementById('audit-table-container');
+    if (!container) return;
+
+    if (!trailRes.events || !trailRes.events.length) {
+      container.innerHTML = `<div class="text-xs text-muted">No audit records found. Click 'Inject QA Bad Data' to simulate audit logs.</div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <table style="width:100%; border-collapse:collapse; font-size:12px; font-family:monospace;">
+        <thead>
+          <tr style="border-bottom:2px solid var(--border); text-align:left; background:var(--surface-2);">
+            <th style="padding:6px;">ID</th>
+            <th style="padding:6px;">Node / Branch</th>
+            <th style="padding:6px;">Event</th>
+            <th style="padding:6px;">QA Status</th>
+            <th style="padding:6px;">ML Risk</th>
+            <th style="padding:6px;">Diagnostic</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${trailRes.events.map(e => `
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:6px;">#${e.id}</td>
+              <td style="padding:6px;">${e.node_id} <span class="text-muted">(${e.branch_name})</span></td>
+              <td style="padding:6px;">${e.event_type}</td>
+              <td style="padding:6px;">
+                <span class="badge ${e.is_bad_data ? 'badge-quarantined' : 'badge-ok'}">
+                  ${e.is_bad_data ? 'BAD DATA' : 'VALID'}
+                </span>
+              </td>
+              <td style="padding:6px; font-weight:600; color:${e.risk_score > 0.7 ? 'var(--danger)' : 'var(--fresh)'};">
+                ${e.risk_score}
+              </td>
+              <td style="padding:6px; color:var(--text-muted);">${e.diagnostic}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (e) {
+    console.error('Error in loadAuditTrail:', e);
+  }
+}
+
+async function injectBadDataAudit() {
+  try {
+    await API.post('/api/audit/log', {
+      node_id: "eu-west-1",
+      branch_name: "qa/adversarial-suite",
+      developer_id: "qa-tester-99",
+      event_type: "QA_POISON_INJECTION",
+      entity_id: "corrupted_entity_999",
+      data: { "malformed_field": "X" * 1000 },
+      timestamp: Date.now() / 1000 - 3600, // 1 hour timestamp drift to trigger QA rule
+      request_rate: 95.0,
+      is_cross_region: true,
+      error_rate: 0.45
+    });
+    alert("⚠️ QA Bad Data event enqueued into batch buffer!");
+    setTimeout(loadAuditTrail, 200);
+  } catch (e) {
+    alert(`Failed: ${e.message}`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Bootstrap
 // ─────────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -955,6 +1206,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (page === 'page-commits')   loadCommitLog();
       if (page === 'page-security')  loadSecurityFeed();
       if (page === 'page-simulator') pollSimSnapshot();
+      if (page === 'page-branches')  loadNodeBranches();
+      if (page === 'page-audit')     loadAuditTrail();
     });
   });
 
@@ -964,4 +1217,5 @@ document.addEventListener('DOMContentLoaded', () => {
   startPolling();
   setInterval(pollSimSnapshot, 1500);
 });
+
 
