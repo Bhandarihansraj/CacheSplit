@@ -418,7 +418,8 @@ const DashboardModel = {
         const res = await fetch(`${API_BASE}/api/dashboard/node-map`, {
             headers: AuthModel.headers()
         });
-        this.nodes = await res.json().nodes || [];
+        const data = await res.json();
+        this.nodes = data.nodes || [];
         return this.nodes;
     },
 
@@ -427,7 +428,8 @@ const DashboardModel = {
             `${API_BASE}/api/dashboard/commits/recent?limit=${limit}`,
             { headers: AuthModel.headers() }
         );
-        this.commits = await res.json().commits || [];
+        const data = await res.json();
+        this.commits = data.commits || [];
         return this.commits;
     },
 
@@ -436,7 +438,8 @@ const DashboardModel = {
             `${API_BASE}/api/dashboard/security-feed?limit=${limit}`,
             { headers: AuthModel.headers() }
         );
-        this.securityFeed = await res.json().alerts || [];
+        const data = await res.json();
+        this.securityFeed = data.alerts || [];
         return this.securityFeed;
     },
 
