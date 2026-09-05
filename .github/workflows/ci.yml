@@ -1,0 +1,47 @@
+name: CacheSplit CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.11"
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx asyncpg
+        
+    - name: Run Phase 0 (Core) Tests
+      run: pytest tests/test_phase0_core.py
+      
+- name: Run Phase 1 (Registry & Agents) Tests
+      run: |
+        pytest tests/test_phase1_registry.py
+        pytest tests/test_phase1_agents.py
+
+    - name: Run ER Fabric (Merkle DAG / Compound Commit / ReBAC) Tests
+      run: pytest tests/test_er_merkle_rebac.py
+
+    - name: Run Phase 2 (Debounce, Postgres, API) Tests
+      run: |
+        pytest tests/test_phase2_debounce.py
+        pytest tests/test_phase2_postgres.py
+        pytest tests/test_api_dashboard.py
+
+    - name: Run Phase 3 (Signing + Propagation) Tests
+      run: pytest tests/test_phase3_propagation_signing.py
+        
+    # Block merge if any gate fails is handled natively by GitHub Actions Branch Protection requiring this check.
