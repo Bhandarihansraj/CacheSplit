@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CacheSplit v4 — Operations Console</title>
+    <link rel="stylesheet" href="/style.css">
+    <script src="/services_v4.js" defer></script>
+</head>
+<body>
+    <div class="layout">
+        <!-- ── Sidebar (Navigation / Controller input) ─────────── -->
+        <nav class="sidebar">
+            <div class="sidebar-brand">
+                <h1>CacheSplit</h1>
+                <div class="version">v4.0 · Full Architecture</div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">Security</div>
+                <div class="nav-item" data-page="page-auth" data-label="Authentication">🔒 Auth</div>
+                <div class="nav-item" data-page="page-tenant" data-label="Tenant Management">👥 Tenants</div>
+                <div class="nav-item" data-page="page-audit" data-label="Audit Trail">📜 Audit</div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">Infrastructure</div>
+                <div class="nav-item" data-page="page-topology" data-label="Topology">🌐 Topology</div>
+                <div class="nav-item" data-page="page-network" data-label="Network Policy">🛡️ Network</div>
+                <div class="nav-item" data-page="page-failover" data-label="DR Failover">⚡ DR</div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">Scale</div>
+                <div class="nav-item" data-page="page-sharding" data-label="Shard Router">🗂️ Sharding</div>
+                <div class="nav-item" data-page="page-queues" data-label="Queue Pool">📊 Queues</div>
+                <div class="nav-item" data-page="page-replicas" data-label="Read Replicas">📖 Replicas</div>
+                <div class="nav-item" data-page="page-ingress" data-label="Ingress">🚪 Ingress</div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">AI / ML</div>
+                <div class="nav-item" data-page="page-priority" data-label="Priority Model">🧠 Priority</div>
+                <div class="nav-item" data-page="page-anomaly" data-label="Anomaly">🔍 Anomaly</div>
+                <div class="nav-item" data-page="page-guardrail" data-label="Guardrail">🛡️ Guardrail</div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-label">Operations</div>
+                <div class="nav-item" data-page="page-ops" data-label="Dashboard">📋 Dashboard</div>
+                <div class="nav-item" data-page="page-developer" data-label="Developer">🛠️ Dev</div>
+                <div class="nav-item" data-page="page-tests" data-label="Test Suite">🧪 Tests</div>
+            </div>
+        </nav>
+
+        <!-- ── Main Content (View) ────────────────────────────── -->
+        <main class="main-content">
+            <header class="topbar">
+                <h2 id="page-title">Operations</h2>
+                <div class="topbar-right">
+                    <span id="auth-status" class="auth-badge">Not authenticated</span>
+                    <span id="tenant-display" class="tenant-badge"></span>
+                    <span id="ws-status" class="ws-dot"></span>
+                </div>
+            </header>
+
+            <!-- Auth Page -->
+            <div class="page" id="page-auth">
+                <div class="card">
+                    <div class="card-header"><h3>🔒 Authentication</h3></div>
+                    <div class="card-body">
+                        <label>Identity</label>
+                        <input id="auth-identity" value="admin">
+                        <label>Password</label>
+                        <input id="auth-password" type="password" value="admin">
+                        <div class="row">
+                            <button class="btn btn-primary" onclick="Controller.authLogin()">Login</button>
+                            <button class="btn btn-ghost" onclick="Controller.authRefresh()">Refresh Token</button>
+                        </div>
+                        <div id="auth-result" class="response-box">// Login to access all v4 features</div>
+                        <div id="auth-info" class="response-box" style="display:none">
+                            // Tenant: <span id="auth-tenant"></span><br>
+                            // Tier: <span id="auth-tier"></span><br>
+                            // Permissions: <span id="auth-perms"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tenant Page -->
+            <div class="page" id="page-tenant">
+                <div class="card">
+                    <div class="card-header"><h3>👥 Tenant Management</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadTenants()">Load Tenants</button>
+                        <div id="tenant-list"></div>
+                        <div id="tenant-detail" class="card" style="margin-top:16px;display:none"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Topology Page -->
+            <div class="page" id="page-topology">
+                <div class="card">
+                    <div class="card-header"><h3>🌐 Topology Manager</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadTopology()">Refresh</button>
+                        <div id="topology-views"></div>
+                        <h4 style="margin-top:16px">Add Region</h4>
+                        <label>Region ID</label><input id="topo-region" value="us-west-2">
+                        <label>Nodes (comma-separated)</label><input id="topo-nodes" value="node-west-1,node-west-2">
+                        <label>Tenant IDs</label><input id="topo-tenants" value="tenant-a,tenant-b">
+                        <button class="btn btn-primary" onclick="Controller.addRegion()">Add Region</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Network Policy Page -->
+            <div class="page" id="page-network">
+                <div class="card">
+                    <div class="card-header"><h3>🛡️ Network Zones</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadNetworkZones()">Load Zones</button>
+                        <div id="network-zones"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DR Failover Page -->
+            <div class="page" id="page-failover">
+                <div class="card">
+                    <div class="card-header"><h3>⚡ DR Failover</h3></div>
+                    <div class="card-body">
+                        <div id="failover-state"></div>
+                        <h4 style="margin-top:16px">Initiate Failover</h4>
+                        <label>Failed Region</label><input id="failover-region" value="us-east-1">
+                        <label>Health Signal</label><input id="failover-signal" value="region_down">
+                        <button class="btn btn-danger" onclick="Controller.initiateFailover()">Initiate</button>
+                        <button class="btn btn-ghost" onclick="Controller.confirmFailover()">Confirm</button>
+                        <div id="failover-result" class="response-box"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sharding Page -->
+            <div class="page" id="page-sharding">
+                <div class="card">
+                    <div class="card-header"><h3>🗂️ Shard Router</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadShardRing()">Refresh Ring</button>
+                        <label>Tenant ID</label><input id="shard-tenant" value="tenant-a">
+                        <button class="btn btn-primary" onclick="Controller.getShard()">Get Shard</button>
+                        <div id="shard-result" class="response-box"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Queue Pool Page -->
+            <div class="page" id="page-queues">
+                <div class="card">
+                    <div class="card-header"><h3>📊 Tenant Queue Pool</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadQueues()">Load Stats</button>
+                        <div id="queue-stats"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Read Replicas Page -->
+            <div class="page" id="page-replicas">
+                <div class="card">
+                    <div class="card-header"><h3>📖 Read Replica Router</h3></div>
+                    <div class="card-body">
+                        <label>Tenant ID</label><input id="replica-tenant" value="tenant-a">
+                        <label>Operation</label>
+                        <select id="replica-op"><option value="read">Read</option><option value="write">Write</option></select>
+                        <button class="btn btn-primary" onclick="Controller.routeReplica()">Route</button>
+                        <div id="replica-result" class="response-box"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ingress Page -->
+            <div class="page" id="page-ingress">
+                <div class="card">
+                    <div class="card-header"><h3>🚪 Ingress Backpressure</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadIngressStats()">Load Stats</button>
+                        <label>Tenant ID</label><input id="ingress-tenant" value="tenant-a">
+                        <label>Tier</label>
+                        <select id="ingress-tier"><option value="enterprise">Enterprise</option><option value="standard">Standard</option><option value="basic">Basic</option></select>
+                        <button class="btn btn-primary" onclick="Controller.checkBackpressure()">Check Backpressure</button>
+                        <div id="ingress-result" class="response-box"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Priority Page -->
+            <div class="page" id="page-priority">
+                <div class="card">
+                    <div class="card-header"><h3>🧠 Priority Model</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadFallbackRate()">Check Fallback Rate</button>
+                        <div id="priority-result" class="response-box"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Anomaly Page -->
+            <div class="page" id="page-anomaly">
+                <div class="card">
+                    <div class="card-header"><h3>🔍 Anomaly Detector</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadAnomalies()">Load Alerts</button>
+                        <button class="btn btn-ghost" onclick="Controller.getAnomalyMetrics()">Metrics</button>
+                        <div id="anomaly-result" class="response-box"></div>
+                        <div id="anomaly-metrics"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Guardrail Page -->
+            <div class="page" id="page-guardrail">
+                <div class="card">
+                    <div class="card-header"><h3>🛡️ Agent Guardrail</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadGuardrailHistory()">Load History</button>
+                        <div id="guardrail-result" class="response-box"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Page (default) -->
+            <div class="page active" id="page-ops">
+                <div class="card">
+                    <div class="card-header"><h3>📋 Dashboard</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="Controller.loadDashboard()">Refresh</button>
+                        <div id="node-map"></div>
+                        <div id="dashboard-metrics"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Developer Page -->
+            <div class="page" id="page-developer">
+                <div class="card">
+                    <div class="card-header"><h3>🛠️ Developer API</h3></div>
+                    <div class="card-body">
+                        <p>Use the <a href="/demo">Developer Demo</a> for interactive API testing.</p>
+                        <div id="dev-status" class="response-box"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Suite Page -->
+            <div class="page" id="page-tests">
+                <div class="card">
+                    <div class="card-header"><h3>🧪 Test Suite</h3></div>
+                    <div class="card-body">
+                        <button class="btn btn-primary" onclick="TestRunner.runAll()">Run All Tests</button>
+                        <button class="btn btn-ghost" onclick="TestRunner.runCategory('auth')">Auth Tests</button>
+                        <button class="btn btn-ghost" onclick="TestRunner.runCategory('infra')">Infra Tests</button>
+                        <button class="btn btn-ghost" onclick="TestRunner.runCategory('scale')">Scale Tests</button>
+                        <button class="btn btn-ghost" onclick="TestRunner.runCategory('ai')">AI/ML Tests</button>
+                        <button class="btn btn-ghost" onclick="TestRunner.runCategory('ui')">UI Tests</button>
+                        <div id="test-results" class="response-box"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/app_v4.js"></script>
+</body>
+</html>
