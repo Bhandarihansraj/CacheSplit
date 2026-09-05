@@ -1603,8 +1603,95 @@ async function refreshSemanticStats() {
     if (elDim) elDim.textContent = stats.dimension ? `${stats.dimension}-D` : '—';
     if (elHitRate) elHitRate.textContent = `${((stats.hit_rate || 0) * 100).toFixed(1)}%`;
     if (elLatency) elLatency.textContent = `${stats.avg_latency_ms || 0}ms`;
+    refreshHnswStats();
   } catch (e) {
     console.error('Failed to refresh semantic stats:', e);
+  }
+}
+
+async function refreshHnswStats() {
+  try {
+    const stats = await API.get('/api/hnsw/stats');
+    const elLevels = document.getElementById('hnsw-stat-levels');
+    const elCompress = document.getElementById('hnsw-stat-compress');
+    const elRecall = document.getElementById('hnsw-stat-recall');
+    const vizContainer = document.getElementById('hnsw-graph-visualizer');
+
+    if (elLevels) elLevels.textContent = stats.max_level >= 0 ? `${stats.max_level + 1} Graph Levels` : '1 Level';
+    if (elCompress && stats.compression_stats?.compression_ratio) {
+      elCompress.textContent = `${stats.compression_stats.compression_ratio}x (${stats.compression_stats.memory_reduction_pct}% RAM Saved)`;
+    }
+
+    if (vizContainer) {
+      const layers = stats.layer_distribution || {};
+      const degrees = stats.average_degrees || {};
+      const comp = stats.compression_stats || {};
+
+      let layerHtml = Object.keys(layers).map(lc => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border);">
+          <span><strong>Layer ${lc}</strong> ${lc == stats.max_level ? '(Top Entry Layer 🚀)' : (lc == 0 ? '(Dense Base Graph 🌐)' : '')}</span>
+          <span class="badge badge-ok">${layers[lc]} nodes · avg degree: ${degrees[`layer_${lc}`] || 0}</span>
+        </div>
+      `).join('') || '<div class="text-xs text-muted">No layers built yet</div>';
+
+      vizContainer.innerHTML = `
+        <div style="margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;font-weight:600;margin-bottom:4px;">
+            <span>Total Nodes: ${stats.total_nodes || 0}</span>
+            <span>Entry Point: <code style="color:var(--accent);">${stats.entry_point || 'None'}</code></span>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:8px;">
+            M=${stats.M || 16} · efConstruction=${stats.ef_construction || 64} · efSearch=${stats.ef_search || 32} · Metric=${stats.metric || 'cosine'}
+          </div>
+          ${layerHtml}
+          <div style="margin-top:10px;padding:6px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;font-size:10px;">
+            <strong>Int8 SQ8 Quantization:</strong> ${comp.raw_memory_bytes || 0} bytes (Float32) &rarr; ${comp.quantized_memory_bytes || 0} bytes (Int8)
+          </div>
+        </div>
+      `;
+    }
+  } catch (e) {
+    console.error('Failed to load HNSW stats:', e);
+  }
+}
+
+async function runHnswBenchmark() {
+  const n = parseInt(document.getElementById('hnsw-bench-n')?.value, 10) || 1000;
+  const dim = parseInt(document.getElementById('hnsw-bench-dim')?.value, 10) || 32;
+  const k = parseInt(document.getElementById('hnsw-bench-k')?.value, 10) || 5;
+  const output = document.getElementById('hnsw-benchmark-result');
+
+  if (output) output.innerHTML = `<div class="state-msg"><div class="spinner"></div><span>Running live benchmark across N=${n}, D=${dim}...</span></div>`;
+
+  try {
+    const res = await API.post('/api/hnsw/benchmark', {
+      num_vectors: n,
+      num_queries: 25,
+      dim: dim,
+      k: k
+    });
+
+    const elRecall = document.getElementById('hnsw-stat-recall');
+    if (elRecall) elRecall.textContent = `${res.recall_accuracy_pct}%`;
+
+    if (output) {
+      output.innerHTML = `
+        <div style="line-height:1.6;">
+          <div style="color:var(--accent);font-weight:600;font-size:12px;margin-bottom:6px;">
+            ⚡ BENCHMARK COMPLETE: N=${res.dataset_size}, Dim=${res.vector_dimension}-D, Top-${res.top_k}
+          </div>
+          <div>• Flat Brute-Force Scan: <strong style="color:var(--danger);">${res.flat_search_avg_us} µs</strong> / query</div>
+          <div>• HNSW Multi-Layer Search: <strong style="color:var(--fresh);">${res.hnsw_search_avg_us} µs</strong> / query</div>
+          <div>• Search Acceleration: <strong style="color:var(--accent);font-size:13px;">${res.speedup_multiplier}x Faster</strong></div>
+          <div>• Recall Accuracy: <strong style="color:var(--fresh);">${res.recall_accuracy_pct}%</strong></div>
+          <div>• Graph Build Time: <strong>${res.hnsw_build_time_ms} ms</strong> (for ${res.dataset_size} items)</div>
+          <div>• Int8 Quantization Savings: <strong>${res.compression_stats.compression_ratio}x (${res.compression_stats.memory_reduction_pct}% RAM reduction)</strong></div>
+        </div>
+      `;
+    }
+    refreshHnswStats();
+  } catch (e) {
+    if (output) output.innerHTML = `<div class="text-xs text-danger">Benchmark failed: ${e.message}</div>`;
   }
 }
 
@@ -1613,8 +1700,9 @@ async function runSemanticQuery() {
   const metric = document.getElementById('sem-query-metric').value;
   const k = parseInt(document.getElementById('sem-query-k').value, 10) || 3;
   const filterStr = document.getElementById('sem-query-filter').value.trim();
-  const useMmr = document.getElementById('sem-query-mmr').checked;
-  const mmrLambda = parseFloat(document.getElementById('sem-query-lambda').value) || 0.5;
+  const useMmr = document.getElementById('sem-query-mmr')?.checked || false;
+  const useHnsw = document.getElementById('sem-query-hnsw')?.checked || false;
+  const mmrLambda = parseFloat(document.getElementById('sem-query-lambda')?.value) || 0.5;
   const resultBox = document.getElementById('sem-query-result');
 
   let vector = [];
@@ -1636,7 +1724,7 @@ async function runSemanticQuery() {
     }
   }
 
-  resultBox.innerHTML = `<div class="text-xs text-muted">Executing vector similarity search...</div>`;
+  resultBox.innerHTML = `<div class="text-xs text-muted">Executing vector similarity search (${useHnsw ? 'HNSW Accelerated' : 'Flat Scan'})...</div>`;
 
   try {
     const res = await API.post('/semantic/query', {

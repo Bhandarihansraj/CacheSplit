@@ -111,15 +111,21 @@ def matches_filter(metadata: dict, filters: Optional[dict[str, Any]]) -> bool:
     return True
 
 
+from core.hnsw_index import HNSWIndex
+
+
 class SemanticCacheIndex:
     """
-    In-memory Semantic Vector Index with hybrid metadata filtering and MMR diversification.
+    In-memory Semantic Vector Index with hybrid metadata filtering, MMR diversification,
+    and HNSW Graph Index acceleration with Int8 Scalar Quantization.
     """
 
-    def __init__(self, name: str = "default"):
+    def __init__(self, name: str = "default", enable_hnsw: bool = True):
         self.name = name
         self._entries: dict[str, VectorEntry] = {}
         self._dimension: Optional[int] = None
+        self.enable_hnsw = enable_hnsw
+        self._hnsw: Optional[HNSWIndex] = None
 
     @property
     def count(self) -> int:
@@ -129,9 +135,15 @@ class SemanticCacheIndex:
     def dimension(self) -> Optional[int]:
         return self._dimension
 
+    @property
+    def hnsw(self) -> Optional[HNSWIndex]:
+        return self._hnsw
+
     def upsert(self, entry: VectorEntry) -> None:
         if self._dimension is None:
             self._dimension = len(entry.vector)
+            if self.enable_hnsw:
+                self._hnsw = HNSWIndex(dim=self._dimension, metric="cosine", enable_quantization=True)
         elif len(entry.vector) != self._dimension:
             raise ValueError(
                 f"Dimension mismatch: expected {self._dimension}, got {len(entry.vector)}"
@@ -139,6 +151,8 @@ class SemanticCacheIndex:
 
         entry.updated_at = time.time()
         self._entries[entry.key] = entry
+        if self._hnsw:
+            self._hnsw.insert(entry.key, entry.vector)
 
     def get(self, key: str) -> Optional[VectorEntry]:
         return self._entries.get(key)
@@ -146,6 +160,8 @@ class SemanticCacheIndex:
     def delete(self, key: str) -> bool:
         if key in self._entries:
             del self._entries[key]
+            if self._hnsw:
+                self._hnsw.delete(key)
             return True
         return False
 
@@ -159,6 +175,7 @@ class SemanticCacheIndex:
         only_fresh: bool = True,
         use_mmr: bool = False,
         mmr_lambda: float = 0.5,
+        use_hnsw: bool = False,
     ) -> list[dict[str, Any]]:
         """
         Executes hybrid semantic search over indexed entries.
@@ -171,6 +188,30 @@ class SemanticCacheIndex:
             raise ValueError(
                 f"Query vector dimension {len(query_vector)} does not match index {self._dimension}"
             )
+
+        # 0. Accelerated HNSW graph search path (if requested, metric is cosine, and no MMR)
+        if use_hnsw and self._hnsw and metric == "cosine" and not use_mmr:
+            def _filter_check(k_id: str) -> bool:
+                ent = self._entries.get(k_id)
+                if not ent:
+                    return False
+                if only_fresh and ent.state != "FRESH":
+                    return False
+                return matches_filter(ent.metadata, filters)
+
+            hnsw_res = self._hnsw.search(query_vector, k=k, filter_fn=_filter_check)
+            out = []
+            for k_id, sim in hnsw_res:
+                if sim >= min_similarity:
+                    ent = self._entries[k_id]
+                    out.append({
+                        "key": k_id,
+                        "similarity": round(sim, 4),
+                        "entry": ent,
+                        "state": ent.state,
+                        "version": ent.version,
+                    })
+            return out
 
         # 1. Candidate selection & metadata filtering
         candidates: list[tuple[str, VectorEntry, float]] = []
@@ -245,3 +286,5 @@ class SemanticCacheIndex:
     def clear(self) -> None:
         self._entries.clear()
         self._dimension = None
+        self._hnsw = None
+
