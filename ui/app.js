@@ -1179,7 +1179,7 @@ async function injectBadDataAudit() {
       developer_id: "qa-tester-99",
       event_type: "QA_POISON_INJECTION",
       entity_id: "corrupted_entity_999",
-      data: { "malformed_field": "X" * 1000 },
+      data: { "malformed_field": "X".repeat(1000) },
       timestamp: Date.now() / 1000 - 3600, // 1 hour timestamp drift to trigger QA rule
       request_rate: 95.0,
       is_cross_region: true,

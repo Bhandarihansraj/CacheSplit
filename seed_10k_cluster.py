@@ -24,7 +24,7 @@ from api.branches import node_branch_engines
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("seed_10k")
 
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "cache_split.db"))
+DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "data", "cachesplit.db"))
 
 NODES = [
     ("us-east-1", "US-East", ["main", "dev/cardiology", "dev/billing", "qa/load-test"]),
@@ -137,14 +137,15 @@ def seed_cluster_10k(entities_per_node: int = 10000):
                 e["parent_id"],
                 e["children_ids_json"],
                 e["updated_at"],
+                e["updated_at"],
             )
             for e in node_entities
         ]
         cur.executemany("""
             INSERT OR REPLACE INTO entity_cache (
                 entity_id, entity_type, region, node_id, data_json,
-                local_hash, merkle_root_hash, parent_id, children_ids_json, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                local_hash, merkle_root_hash, parent_id, children_ids_json, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, db_rows)
         conn.commit()
         total_seeded += len(node_entities)

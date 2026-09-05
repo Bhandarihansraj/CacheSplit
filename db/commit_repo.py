@@ -90,11 +90,11 @@ async def upsert_entity(
 
 async def get_entities_by_node(node_id: str, limit: int = 50) -> list[dict]:
     db = get_db()
-    # Return root entities first (no parent), then children
+    # Return entities for this node
     async with db.execute(
         """
         SELECT * FROM entity_cache
-        WHERE node_id=? AND entity_type IN ('patient', 'clinician')
+        WHERE node_id=?
         ORDER BY entity_id ASC LIMIT ?
         """,
         (node_id, limit),
