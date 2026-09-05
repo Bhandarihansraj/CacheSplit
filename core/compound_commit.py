@@ -11,6 +11,7 @@ class EntityMutation(BaseModel):
     entity_type: str
     entity_id: str
     data: Dict[str, Any]  # renamed from 'diff' for API/UI alignment
+    expected_version: Optional[int] = None  # OCC guard
 
 class RelationshipEdge(BaseModel):
     source: str
@@ -40,9 +41,19 @@ class CompoundCommit(BaseModel):
         """
         # 1. Apply or upsert entities
         updated_roots = set()
+        
+        # Phase 1a: Pre-flight OCC checks
+        for mut in self.mutations:
+            if mut.entity_id in dag.entities and mut.expected_version is not None:
+                current_version = dag.entities[mut.entity_id].version
+                if current_version != mut.expected_version:
+                    raise ValueError(f"OCC Conflict: Entity {mut.entity_id} version mismatch (expected {mut.expected_version}, got {current_version})")
+
+        # Phase 1b: Apply mutations
         for mut in self.mutations:
             if mut.entity_id in dag.entities:
                 dag.entities[mut.entity_id].data.update(mut.data)
+                dag.entities[mut.entity_id].version += 1  # Increment version on edit
                 dag.entities[mut.entity_id].compute_local_hash()
             else:
                 new_entity = EntityNode(

@@ -475,3 +475,47 @@ input:focus, select:focus, textarea:focus { border-color: var(--text-1); }
   padding: 14px 18px; border-bottom: 1px solid var(--border);
 }
 .modal-card .card-body { padding: 18px; }
+
+/* ── Diff styling ────────────────────────────────────────────────── */
+.diff-del { color: var(--danger); background: #FDEAEA; display: block; padding: 2px 4px; }
+.diff-add { color: var(--ok); background: #EBF5EB; display: block; padding: 2px 4px; }
+.diff-equal { color: var(--text-2); display: block; padding: 2px 4px; }
+.diff-section { margin-bottom: 16px; border-bottom: 1px solid var(--border-2); padding-bottom: 8px; }
+.diff-section:last-child { border-bottom: none; }
+.diff-header { font-weight: 600; color: var(--text-1); margin-bottom: 4px; }
+
+/* ── Git Graph styling ───────────────────────────────────────────── */
+.commit-graph-container {
+  position: relative;
+  padding-left: 24px !important;
+}
+.commit-graph-container::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  left: 20px;
+  width: 2px;
+  background: var(--border-2);
+  z-index: 0;
+}
+.commit-node {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+}
+.commit-node-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent-2);
+  margin-top: 4px;
+  margin-left: -5px; /* Align with border line */
+  flex-shrink: 0;
+}
+.commit-node-body { flex: 1; }
+

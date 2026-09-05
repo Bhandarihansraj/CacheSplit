@@ -33,4 +33,5 @@
 - [x] **Phase 2:** Postgres Adapter with asyncpg, idempotency, Multi-master read APIs.
 - [x] **Phases 3-8 (ER Fabric):** Relational Merkle DAG, Compound Commits, ReBAC Graph Access Control, Regional Scaled Partitioning (100k+ entities).
 - [x] **Phases 9-10:** CI/CD Workflow (`.github/workflows/ci.yml`), Ops routines (`ops/`), Tenant Config schema (`core/tenant_config.py`).
+- [ ] **Phase 11 (State Management):** Optimistic Concurrency Control (OCC), WebSocket Real-Time Sync, and Session Presence.
 - [x] **Interactive Operations Console:** Live interactive dashboard at `http://127.0.0.1:8000/`.

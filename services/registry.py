@@ -15,8 +15,12 @@ class NodeStatus(BaseModel):
     health: Literal["ok", "stale", "quarantined"] = "ok"
     agent_flags: list[str] = []
     heartbeat_enabled: bool = True
+    handshake_status: Literal["pending", "approved", "rejected"] = "pending"
+    join_token: str = ""
 
 class NodeRegistry:
+    MINIMUM_NODE_VERSION = 3
+
     def __init__(self, timeout_seconds: int = 20):
         self.nodes: Dict[str, NodeStatus] = {}
         self.timeout_seconds = timeout_seconds
@@ -66,7 +70,7 @@ class NodeRegistry:
             if current_time - status.last_heartbeat > self.timeout_seconds:
                 self.mark_stale(node_id, "timeout")
 
-    def register_node(self, node_id: str, region: str, tier: Literal["main", "sub"], parent_node_id: Optional[str] = None) -> None:
+    def register_node(self, node_id: str, region: str, tier: Literal["main", "sub"], parent_node_id: Optional[str] = None, join_token: str = "") -> None:
         if node_id not in self.nodes:
             self.nodes[node_id] = NodeStatus(
                 node_id=node_id,
@@ -74,7 +78,9 @@ class NodeRegistry:
                 tier=tier,
                 parent_node_id=parent_node_id,
                 last_heartbeat=time.time(),
-                heartbeat_enabled=True
+                heartbeat_enabled=True,
+                join_token=join_token,
+                handshake_status="pending"
             )
 
     def heartbeat(self, node_id: str, current_commit_hash: str, version_number: int, cache_summary: dict[str, str]) -> None:
@@ -87,6 +93,21 @@ class NodeRegistry:
             if node.health == "stale" and "timeout" in node.agent_flags:
                 node.health = "ok"
                 node.agent_flags.remove("timeout")
+
+    def handshake(self, node_id: str, version_number: int, join_token: str) -> bool:
+        if node_id in self.nodes:
+            node = self.nodes[node_id]
+            if version_number < self.MINIMUM_NODE_VERSION:
+                node.handshake_status = "rejected"
+                return False
+            if node.join_token and node.join_token != join_token:
+                node.handshake_status = "rejected"
+                return False
+            
+            node.handshake_status = "approved"
+            node.version_number = version_number
+            return True
+        return False
 
     def toggle_heartbeat(self, node_id: str, enabled: Optional[bool] = None) -> bool:
         if node_id in self.nodes:

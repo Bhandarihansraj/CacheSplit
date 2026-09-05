@@ -159,14 +159,29 @@ class CompoundCommitPayload(BaseModel):
 
 @router.post("/compound-commit")
 async def execute_compound_commit(payload: CompoundCommitPayload):
+    from services.state_manager import state_manager
     commit = CompoundCommit(
         transaction_id=payload.transaction_id,
         mutations=payload.mutations,
         edges=payload.edges,
     )
-    result = await cache_store.execute_compound_commit(commit)
+    try:
+        result = await cache_store.execute_compound_commit(commit)
+    except ValueError as e:
+        if "OCC Conflict" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+        
     # Flush any ML anomalies triggered by the access logging above
     await analytics.flush_anomalies()
+    
+    # Broadcast to all active UI clients
+    await state_manager.broadcast({
+        "type": "STATE_MUTATED", 
+        "transaction_id": payload.transaction_id,
+        "mutated_entities": [m.entity_id for m in payload.mutations]
+    })
+    
     return {"status": "success", "result": result}
 
 

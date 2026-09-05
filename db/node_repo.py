@@ -21,6 +21,8 @@ async def upsert_node(
     agent_flags: Optional[list] = None,
     version_number: int = 0,
     current_commit_hash: str = "",
+    handshake_status: str = "pending",
+    join_token: str = "",
 ) -> None:
     db = get_db()
     flags_json = json.dumps(agent_flags or [])
@@ -29,8 +31,9 @@ async def upsert_node(
     await db.execute(
         """
         INSERT INTO nodes (node_id, region, tier, health, last_heartbeat, heartbeat_enabled,
-                           agent_flags, version_number, current_commit_hash, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           agent_flags, version_number, current_commit_hash, created_at,
+                           handshake_status, join_token)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(node_id) DO UPDATE SET
             region=excluded.region,
             tier=excluded.tier,
@@ -39,10 +42,13 @@ async def upsert_node(
             heartbeat_enabled=excluded.heartbeat_enabled,
             agent_flags=excluded.agent_flags,
             version_number=excluded.version_number,
-            current_commit_hash=excluded.current_commit_hash
+            current_commit_hash=excluded.current_commit_hash,
+            handshake_status=excluded.handshake_status,
+            join_token=excluded.join_token
         """,
         (node_id, region, tier, health, lb, int(heartbeat_enabled),
-         flags_json, version_number, current_commit_hash, ts),
+         flags_json, version_number, current_commit_hash, ts,
+         handshake_status, join_token),
     )
     await db.commit()
 
@@ -56,6 +62,15 @@ async def update_node_health(node_id: str, health: str, agent_flags: Optional[li
         )
     else:
         await db.execute("UPDATE nodes SET health=? WHERE node_id=?", (health, node_id))
+    await db.commit()
+
+
+async def update_handshake_status(node_id: str, status: str) -> None:
+    db = get_db()
+    await db.execute(
+        "UPDATE nodes SET handshake_status=? WHERE node_id=?",
+        (status, node_id)
+    )
     await db.commit()
 
 

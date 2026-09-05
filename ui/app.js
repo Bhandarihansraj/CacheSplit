@@ -81,6 +81,7 @@ const state = {
   commitLog: [],
   securityFeed: [],
   pollInterval: null,
+  stagedMutations: [],
 };
 
 // ── Navigation ────────────────────────────────────────────────────────────
@@ -268,7 +269,7 @@ function renderMerkleTree(node, container, isRoot = true) {
       <span class="dag-node-id">${node.entity_id}</span>
       <span class="dag-node-type">${node.entity_type}</span>
     </div>
-    <div class="dag-node-hash">⬡ ${shortHash}…</div>
+    <div class="dag-node-hash">⬡ ${shortHash}… | <b>v${node.version || 1}</b></div>
     ${node.data ? `<div class="dag-node-data">${JSON.stringify(node.data).slice(0,80)}…</div>` : ''}
   `;
   if (isRoot) { container.innerHTML = ''; container.className = 'dag-tree scroll-panel'; }
@@ -298,13 +299,13 @@ async function loadCommitLog() {
 function renderCommitLog(commits) {
   const logEl = document.getElementById('commit-log');
   if (!commits.length) {
-    logEl.innerHTML = `<div class="state-msg text-muted">No commits yet. Use the Compound Commit form to write data.</div>`;
+    logEl.innerHTML = `<div class="state-msg text-muted">No commits yet.</div>`;
     return;
   }
-  logEl.innerHTML = `<div class="feed">` + commits.map(c => `
-    <div class="feed-item">
-      <div class="feed-dot" style="background:var(--accent-2)"></div>
-      <div class="feed-body">
+  logEl.innerHTML = commits.map(c => `
+    <div class="commit-node">
+      <div class="commit-node-dot"></div>
+      <div class="commit-node-body">
         <div class="feed-title font-mono text-xs">${c.transaction_id}</div>
         <div class="feed-meta">
           ${c.entity_ids?.length || 0} entities · hash: ${(c.commit_hash||'').slice(0,16)}… · ${timeFmt(c.created_at)}
@@ -312,29 +313,111 @@ function renderCommitLog(commits) {
       </div>
       <div class="feed-badge"><span class="badge badge-ok">Committed</span></div>
     </div>
-  `).join('') + `</div>`;
+  `).join('');
 }
 
-async function submitCompoundCommit() {
+async function fetchBaseJson() {
+  const entityId = document.getElementById('commit-entity-id').value.trim();
+  const resultEl = document.getElementById('commit-result');
+  if (!entityId) {
+    resultEl.innerHTML = `<div class="result-err">Entity ID required to fetch current state.</div>`;
+    return;
+  }
+  try {
+    const data = await API.get(`/api/dashboard/entity/${entityId}/merkle-tree`);
+    if (data && data.merkle_tree) {
+      document.getElementById('commit-entity-type').value = data.merkle_tree.entity_type || '';
+      document.getElementById('commit-data-json').value = JSON.stringify(data.merkle_tree.data || {}, null, 2);
+      document.getElementById('commit-expected-version').value = data.merkle_tree.version || '';
+      resultEl.innerHTML = `<div class="result-ok">Fetched current state for ${entityId}</div>`;
+    }
+  } catch (e) {
+    resultEl.innerHTML = `<div class="result-err">Failed to fetch base JSON: ${e.message}</div>`;
+  }
+}
+
+function setStagingMode(mode) {
+  document.getElementById('btn-mode-edit').classList.toggle('active', mode === 'edit');
+  document.getElementById('btn-mode-diff').classList.toggle('active', mode === 'diff');
+  document.getElementById('staging-edit-mode').style.display = mode === 'edit' ? 'block' : 'none';
+  document.getElementById('staging-diff-mode').style.display = mode === 'diff' ? 'block' : 'none';
+  if (mode === 'diff') {
+    renderDiff();
+  }
+}
+
+function stageMutation() {
   const resultEl = document.getElementById('commit-result');
   const entityId  = document.getElementById('commit-entity-id').value.trim();
   const entityType= document.getElementById('commit-entity-type').value.trim();
   const dataRaw   = document.getElementById('commit-data-json').value.trim();
+  const expVerStr = document.getElementById('commit-expected-version').value.trim();
 
   if (!entityId || !entityType || !dataRaw) {
-    resultEl.innerHTML = `<div class="result-err">All fields required.</div>`;
+    resultEl.innerHTML = `<div class="result-err">Entity ID, Type, and Data fields are required.</div>`;
     return;
   }
   let dataObj;
   try { dataObj = JSON.parse(dataRaw); }
   catch { resultEl.innerHTML = `<div class="result-err">Invalid JSON in data field.</div>`; return; }
 
+  let mutationPayload = { entity_id: entityId, entity_type: entityType, data: dataObj };
+  if (expVerStr) mutationPayload.expected_version = parseInt(expVerStr, 10);
+
+  state.stagedMutations.push(mutationPayload);
+  updateStagedCount();
+  resultEl.innerHTML = `<div class="result-ok">Staged mutation for ${entityId}</div>`;
+  
+  // Clear form
+  document.getElementById('commit-entity-id').value = '';
+  document.getElementById('commit-entity-type').value = '';
+  document.getElementById('commit-data-json').value = '';
+  document.getElementById('commit-expected-version').value = '';
+}
+
+function updateStagedCount() {
+  const count = state.stagedMutations.length;
+  document.getElementById('staged-count').textContent = count;
+  document.getElementById('btn-commit-staged').disabled = count === 0;
+}
+
+function clearStaged() {
+  state.stagedMutations = [];
+  updateStagedCount();
+  document.getElementById('commit-result').innerHTML = '';
+  renderDiff();
+}
+
+function renderDiff() {
+  const diffView = document.getElementById('diff-view');
+  if (state.stagedMutations.length === 0) {
+    diffView.innerHTML = `<div class="state-msg text-muted">No pending mutations staged.</div>`;
+    return;
+  }
+  
+  let html = '';
+  for (const m of state.stagedMutations) {
+    html += `<div class="diff-section">
+      <div class="diff-header">${m.entity_id} (${m.entity_type}) ${m.expected_version ? `[v${m.expected_version}]` : ''}</div>
+      <div class="diff-add">+ ${JSON.stringify(m.data)}</div>
+    </div>`;
+  }
+  diffView.innerHTML = html;
+}
+
+async function submitStagedCommit() {
+  const resultEl = document.getElementById('commit-result');
+  if (state.stagedMutations.length === 0) {
+    resultEl.innerHTML = `<div class="result-err">No mutations staged.</div>`;
+    return;
+  }
+
   resultEl.innerHTML = `<div class="state-msg"><div class="spinner"></div><span>Committing…</span></div>`;
   try {
     const txId = `tx-${Date.now()}`;
     const data = await API.post('/api/dashboard/compound-commit', {
       transaction_id: txId,
-      mutations: [{ entity_id: entityId, entity_type: entityType, data: dataObj }],
+      mutations: state.stagedMutations,
       edges: [],
     });
     resultEl.innerHTML = `
@@ -342,6 +425,7 @@ async function submitCompoundCommit() {
         <strong>Committed</strong> — tx: ${data.result?.transaction_id}<br>
         <span class="result-mono">Hash: ${data.result?.commit_hash}</span>
       </div>`;
+    clearStaged();
     await loadCommitLog();
   } catch (e) {
     resultEl.innerHTML = `<div class="result-err">${e.message}</div>`;
@@ -632,16 +716,44 @@ async function deleteNode(nodeId) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
-// Live Poll — refreshes node map and security feed every 5s
+// WebSocket & Sync
 // ─────────────────────────────────────────────────────────────────────────
+function initWebSocket() {
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${protocol}://${window.location.host}/api/ws/state`);
+  
+  ws.onopen = () => console.log('[WebSocket] Connected');
+  
+  ws.onmessage = async (event) => {
+    const data = JSON.parse(event.data);
+    console.log('[WebSocket] Event received:', data);
+    
+    if (data.type === 'STATE_MUTATED') {
+      const activePage = document.querySelector('.page.active')?.id;
+      if (activePage === 'page-commits')  await loadCommitLog();
+      if (activePage === 'page-ops')      await loadNodeMap();
+      
+      // If we are looking at the entity that just mutated, reload it
+      if (activePage === 'page-entities' && state.selectedEntityId && data.mutated_entities?.includes(state.selectedEntityId)) {
+        await loadMerkleTree(state.selectedEntityId);
+      }
+    }
+  };
+
+  ws.onclose = () => {
+    console.warn('[WebSocket] Disconnected, retrying in 5s...');
+    setTimeout(initWebSocket, 5000);
+  };
+}
+
 function startPolling() {
   if (state.pollInterval) clearInterval(state.pollInterval);
+  // Slower background sync (30s) as fallback, WS does the heavy lifting now
   state.pollInterval = setInterval(async () => {
     const activePage = document.querySelector('.page.active')?.id;
     if (activePage === 'page-ops')      await loadNodeMap();
     if (activePage === 'page-security') await loadSecurityFeed();
-    if (activePage === 'page-commits')  await loadCommitLog();
-  }, 5000);
+  }, 30000);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -662,5 +774,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initial load
   loadNodeMap();
+  initWebSocket();
   startPolling();
 });

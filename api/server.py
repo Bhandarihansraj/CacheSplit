@@ -6,7 +6,7 @@ import os
 import time
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -17,9 +17,12 @@ from db import node_repo
 from services.registry import registry
 from services.cache_store import cache_store
 from services.analytics import analytics
+from services.state_manager import state_manager
 from api.dashboard import router as dashboard_router
 from api.query import router as query_router
 from api.propagation import router as propagation_router
+from api.users import router as users_router
+from api.payments import router as payments_router
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger(__name__)
@@ -83,6 +86,8 @@ app.add_middleware(
 app.include_router(dashboard_router)
 app.include_router(query_router)
 app.include_router(propagation_router)
+app.include_router(users_router)
+app.include_router(payments_router)
 
 
 # ──────────────────────── Core API Routes ────────────────────────────────────
@@ -108,10 +113,23 @@ async def heartbeat(req: HeartbeatRequest):
     return {"status": "ok"}
 
 
+class HandshakeRequest(BaseModel):
+    node_id: str
+    version_number: int
+    join_token: str
+
+@app.post("/api/handshake")
+async def handshake(req: HandshakeRequest):
+    success = registry.handshake(req.node_id, req.version_number, req.join_token)
+    status = "approved" if success else "rejected"
+    await node_repo.update_handshake_status(req.node_id, status)
+    return {"status": status}
+
+
 @app.post("/api/register")
-async def register(node_id: str, region: str, tier: str, parent_node_id: str = None):
-    registry.register_node(node_id, region, tier, parent_node_id)
-    await node_repo.upsert_node(node_id=node_id, region=region, tier=tier)
+async def register(node_id: str, region: str, tier: str, join_token: str, parent_node_id: str = None):
+    registry.register_node(node_id, region, tier, parent_node_id, join_token)
+    await node_repo.upsert_node(node_id=node_id, region=region, tier=tier, join_token=join_token)
     return {"status": "registered"}
 
 
@@ -128,6 +146,15 @@ async def debug_quarantine(node_id: str, reason: str):
     await node_repo.update_node_health(node_id, "quarantined", flags)
     return {"status": "quarantined", "node_id": node_id}
 
+
+@app.websocket("/api/ws/state")
+async def websocket_endpoint(websocket: WebSocket):
+    await state_manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+    except WebSocketDisconnect:
+        state_manager.disconnect(websocket)
 
 # ──────────────────────── Static UI ──────────────────────────────────────────
 

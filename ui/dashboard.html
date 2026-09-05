@@ -208,38 +208,71 @@
       <div class="section-header">
         <div>
           <h2>Commit Lab</h2>
-          <p>Issue compound commits and inspect the persistent commit log from SQLite.</p>
+          <p>Stage mutations, visualize changes, and issue compound commits to SQLite.</p>
         </div>
       </div>
       <div class="grid-2">
-        <!-- Commit Form -->
+        <!-- Staging Area -->
         <div class="card">
-          <div class="card-header"><h3>New Compound Commit</h3></div>
+          <div class="card-header">
+            <h3>Staging Area</h3>
+            <div class="row gap-8">
+              <button class="btn btn-ghost btn-sm active" id="btn-mode-edit" onclick="setStagingMode('edit')">Edit Mode</button>
+              <button class="btn btn-ghost btn-sm" id="btn-mode-diff" onclick="setStagingMode('diff')">Diff Mode</button>
+            </div>
+          </div>
           <div class="card-body">
-            <div class="form-group">
-              <label for="commit-entity-id">Entity ID</label>
-              <input id="commit-entity-id" type="text" placeholder="e.g. pat_us_east_001">
+            <div id="staging-edit-mode">
+              <div class="form-group">
+                <label for="commit-entity-id">Entity ID</label>
+                <div style="display:flex;gap:8px;">
+                  <input id="commit-entity-id" type="text" placeholder="e.g. pat_us_east_001" style="flex:1">
+                  <button class="btn btn-ghost btn-sm" onclick="fetchBaseJson()">Fetch Current</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="commit-entity-type">Entity Type</label>
+                <input id="commit-entity-type" type="text" placeholder="patient · visit · lab_result · bed">
+              </div>
+              <div class="form-group">
+                <label for="commit-data-json">Data (JSON)</label>
+                <textarea id="commit-data-json" rows="6" placeholder='{"condition":"Stable","status":"updated"}'></textarea>
+              </div>
+              <div class="form-group">
+                <label for="commit-expected-version">Expected Version (OCC)</label>
+                <input id="commit-expected-version" type="number" placeholder="Leave empty to force overwrite" min="1">
+              </div>
+              <div class="row gap-8 mt-12">
+                <button class="btn btn-secondary" style="border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface-2);cursor:pointer;padding:6px 12px;font-size:12px;font-weight:500;" onclick="stageMutation()">+ Stage Mutation</button>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="commit-entity-type">Entity Type</label>
-              <input id="commit-entity-type" type="text" placeholder="patient · visit · lab_result · bed">
+
+            <div id="staging-diff-mode" style="display:none;">
+              <div id="diff-view" class="scroll-panel" style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;font-family:monospace;font-size:12px;white-space:pre-wrap;margin-bottom:12px;min-height:150px;">
+                <div class="state-msg text-muted">No pending mutations staged.</div>
+              </div>
             </div>
-            <div class="form-group">
-              <label for="commit-data-json">Data (JSON)</label>
-              <textarea id="commit-data-json" rows="5" placeholder='{"condition":"Stable","status":"updated"}'></textarea>
+            
+            <hr style="border:0;border-top:1px solid var(--border);margin:16px 0;">
+            <div class="row-between">
+              <div>
+                <strong>Staged Mutations:</strong> <span id="staged-count">0</span>
+              </div>
+              <button class="btn btn-primary" id="btn-commit-staged" onclick="submitStagedCommit()" disabled>Commit Staged →</button>
             </div>
-            <button class="btn btn-primary" onclick="submitCompoundCommit()">Commit →</button>
+            <button class="btn btn-ghost btn-sm mt-8" onclick="clearStaged()">Clear All</button>
             <div id="commit-result" class="mt-12"></div>
           </div>
         </div>
+
         <!-- Commit Log -->
         <div class="card">
           <div class="card-header">
-            <h3>Recent Commits</h3>
+            <h3>Commit Graph</h3>
             <button class="btn btn-ghost btn-sm" onclick="loadCommitLog()">Refresh</button>
           </div>
           <div class="card-body" style="padding:0">
-            <div id="commit-log" class="scroll-panel" style="padding:8px 12px">
+            <div id="commit-log" class="scroll-panel commit-graph-container" style="padding:16px">
               <div class="state-msg">Loading…</div>
             </div>
           </div>

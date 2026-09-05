@@ -13,6 +13,7 @@ class EntityNode(BaseModel):
     merkle_root_hash: str = ""
     region: str = "US-East"
     anchor_root_id: Optional[str] = None  # Colocation affinity partition key
+    version: int = 1  # For Optimistic Concurrency Control (OCC)
 
     def compute_local_hash(self) -> str:
         payload = {

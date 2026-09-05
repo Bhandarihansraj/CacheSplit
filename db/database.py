@@ -27,7 +27,9 @@ CREATE TABLE IF NOT EXISTS nodes (
     agent_flags TEXT NOT NULL DEFAULT '[]',
     version_number INTEGER NOT NULL DEFAULT 0,
     current_commit_hash TEXT NOT NULL DEFAULT '',
-    created_at REAL NOT NULL
+    created_at REAL NOT NULL,
+    handshake_status TEXT NOT NULL DEFAULT 'pending',
+    join_token TEXT NOT NULL DEFAULT ''
 );
 
 CREATE TABLE IF NOT EXISTS commit_log (
@@ -100,6 +102,12 @@ async def init_db(db_path: Optional[str] = None) -> aiosqlite.Connection:
         await _db.execute("ALTER TABLE commit_log ADD COLUMN hashable_json TEXT NOT NULL DEFAULT ''")
     except Exception:
         pass  # column already exists
+
+    try:
+        await _db.execute("ALTER TABLE nodes ADD COLUMN handshake_status TEXT NOT NULL DEFAULT 'pending'")
+        await _db.execute("ALTER TABLE nodes ADD COLUMN join_token TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
 
     await _db.commit()
     logger.info(f"Database initialized at {resolved_path}")
