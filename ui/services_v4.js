@@ -1,8 +1,8 @@
-"""
-Model Layer — CacheSplit v4 API Client.
-Encapsulates all HTTP/WebSocket communication.
-Controller and View never touch raw fetch() directly.
-"""
+/**
+ * Model Layer — CacheSplit v4 API Client.
+ * Encapsulates all HTTP/WebSocket communication.
+ * Controller and View never touch raw fetch() directly.
+ */
 const API_BASE = 'http://127.0.0.1:8000';
 const API_KEY = 'cs_live_55464b6bedb94e77b6444fe49c2e4a2c';
 const AUTH_TOKEN = null; // Set after login via /api/auth/token

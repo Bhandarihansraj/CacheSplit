@@ -238,6 +238,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 _ui_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "ui"))
 _dashboard_file = os.path.join(_ui_dir, "dashboard.html")
+_v4_dashboard_file = os.path.join(_ui_dir, "v4_dashboard.html")
 _sim_dashboard = os.path.join(_ui_dir, "simulation_dashboard.html")
 _dev_demo = os.path.join(_ui_dir, "developer_demo.html")
 _test_cases = os.path.join(_ui_dir, "test_cases.html")
@@ -245,25 +246,40 @@ _test_cases = os.path.join(_ui_dir, "test_cases.html")
 
 @app.get("/")
 @app.get("/dashboard")
+@app.get("/dashboard.html")
+@app.get("/index.html")
 async def root():
     if os.path.exists(_dashboard_file):
-        return FileResponse(_dashboard_file)
+        return FileResponse(_dashboard_file, media_type="text/html")
     return {"status": "CacheSplit v4 running"}
 
 
+@app.get("/v4")
+@app.get("/v4_dashboard")
+@app.get("/v4_dashboard.html")
+async def v4_dashboard():
+    if os.path.exists(_v4_dashboard_file):
+        return FileResponse(_v4_dashboard_file, media_type="text/html")
+    if os.path.exists(_dashboard_file):
+        return FileResponse(_dashboard_file, media_type="text/html")
+    return {"error": "v4_dashboard.html not found"}
+
+
 @app.get("/simulation")
+@app.get("/simulation_dashboard.html")
 async def simulation_page():
     if os.path.exists(_sim_dashboard):
-        return FileResponse(_sim_dashboard)
+        return FileResponse(_sim_dashboard, media_type="text/html")
     if os.path.exists(_dashboard_file):
-        return FileResponse(_dashboard_file)
+        return FileResponse(_dashboard_file, media_type="text/html")
     return {"error": "Simulation dashboard not found"}
 
 
 @app.get("/demo")
+@app.get("/developer_demo.html")
 async def developer_demo():
     if os.path.exists(_dev_demo):
-        return FileResponse(_dev_demo)
+        return FileResponse(_dev_demo, media_type="text/html")
     return {"error": "Demo file not found"}
 
 
@@ -271,7 +287,7 @@ async def developer_demo():
 @app.get("/test_cases.html")
 async def test_cases():
     if os.path.exists(_test_cases):
-        return FileResponse(_test_cases)
+        return FileResponse(_test_cases, media_type="text/html")
     return {"error": "test_cases.html not found"}
 
 
@@ -291,6 +307,23 @@ async def app_js():
     return {"error": "app.js not found"}
 
 
+@app.get("/app_v4.js")
+async def app_v4_js():
+    js_file = os.path.join(_ui_dir, "app_v4.js")
+    if os.path.exists(js_file):
+        return FileResponse(js_file, media_type="application/javascript")
+    return {"error": "app_v4.js not found"}
+
+
+@app.get("/services_v4.js")
+async def services_v4_js():
+    js_file = os.path.join(_ui_dir, "services_v4.js")
+    if os.path.exists(js_file):
+        return FileResponse(js_file, media_type="application/javascript")
+    return {"error": "services_v4.js not found"}
+
+
 if os.path.exists(_ui_dir):
     app.mount("/static", StaticFiles(directory=_ui_dir), name="static")
+
 
