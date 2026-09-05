@@ -1,13 +1,15 @@
 """
 api/redis_api.py
 FastAPI router exposing unified Redis command execution, key inspection,
-type metadata, and store monitoring for CacheSplit.
+TTL expiration management, memory eviction configuration, and store monitoring for CacheSplit.
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from core.redis_store import (
+    EvictionPolicy,
+    OOMError,
     RedisError,
     RedisStore,
     RedisType,
@@ -19,14 +21,18 @@ router = APIRouter(prefix="/api/redis", tags=["redis"])
 
 
 class CommandRequest(BaseModel):
-    cmd: str = Field(..., description="Redis command name, e.g. SET, GET, HSET, LPUSH, SADD, ZADD")
+    cmd: str = Field(..., description="Redis command name, e.g. SET, GET, EXPIRE, TTL, HSET, LPUSH, SADD, ZADD")
     args: List[Any] = Field(default_factory=list, description="Arguments for the Redis command")
 
 
-class KeyInfo(BaseModel):
-    key: str
-    type: str
-    size: int
+class ExpireRequest(BaseModel):
+    key: str = Field(..., description="Key to set TTL on")
+    seconds: float = Field(..., gt=0, description="Expiration time in seconds")
+
+
+class EvictionConfigRequest(BaseModel):
+    max_keys: Optional[int] = Field(default=None, description="Maximum number of keys in store (null for unlimited)")
+    policy: Optional[str] = Field(default=None, description="Eviction policy (allkeys-lru, volatile-lru, allkeys-lfu, volatile-lfu, volatile-ttl, noeviction, allkeys-random)")
 
 
 @router.post("/command")
@@ -38,6 +44,7 @@ def execute_redis_command(req: CommandRequest) -> Dict[str, Any]:
               LPUSH, RPUSH, LPOP, RPOP, LRANGE, LLEN, LINDEX, LTRIM,
               SADD, SMEMBERS, SREM, SISMEMBER, SCARD, SINTER, SUNION, SDIFF,
               ZADD, ZRANGE, ZREVRANGE, ZRANGEBYSCORE, ZRANK, ZREVRANK, ZSCORE, ZREM, ZCARD, ZCOUNT,
+              EXPIRE, PEXPIRE, EXPIREAT, PEXPIREAT, TTL, PTTL, PERSIST,
               DEL, EXISTS, TYPE, KEYS, FLUSHDB, DBSIZE.
     """
     cmd = req.cmd.strip().upper()
@@ -49,9 +56,28 @@ def execute_redis_command(req: CommandRequest) -> Dict[str, Any]:
             if len(args) < 2:
                 raise RedisError("ERR wrong number of arguments for 'set' command")
             key, val = str(args[0]), args[1]
-            nx = bool(len(args) > 2 and str(args[2]).upper() == "NX")
-            xx = bool(len(args) > 2 and str(args[2]).upper() == "XX")
-            res = redis_store.set(key, val, nx=nx, xx=xx)
+            nx = False
+            xx = False
+            ex: Optional[float] = None
+            px: Optional[int] = None
+
+            # Parse optional arguments: [NX|XX] [EX seconds|PX milliseconds]
+            i = 2
+            while i < len(args):
+                opt = str(args[i]).upper()
+                if opt == "NX":
+                    nx = True
+                elif opt == "XX":
+                    xx = True
+                elif opt == "EX" and i + 1 < len(args):
+                    ex = float(args[i + 1])
+                    i += 1
+                elif opt == "PX" and i + 1 < len(args):
+                    px = int(args[i + 1])
+                    i += 1
+                i += 1
+
+            res = redis_store.set(key, val, nx=nx, xx=xx, ex=ex, px=px)
             return {"ok": True, "command": cmd, "result": "OK" if res else None}
 
         elif cmd == "GET":
@@ -100,6 +126,49 @@ def execute_redis_command(req: CommandRequest) -> Dict[str, Any]:
             if len(args) != 1:
                 raise RedisError("ERR wrong number of arguments for 'strlen' command")
             res = redis_store.strlen(str(args[0]))
+            return {"ok": True, "command": cmd, "result": res}
+
+        # ── TTL & Expiration ──────────────────────────────────────────────────
+        elif cmd == "EXPIRE":
+            if len(args) != 2:
+                raise RedisError("ERR wrong number of arguments for 'expire' command")
+            res = 1 if redis_store.expire(str(args[0]), float(args[1])) else 0
+            return {"ok": True, "command": cmd, "result": res}
+
+        elif cmd == "PEXPIRE":
+            if len(args) != 2:
+                raise RedisError("ERR wrong number of arguments for 'pexpire' command")
+            res = 1 if redis_store.pexpire(str(args[0]), int(args[1])) else 0
+            return {"ok": True, "command": cmd, "result": res}
+
+        elif cmd == "EXPIREAT":
+            if len(args) != 2:
+                raise RedisError("ERR wrong number of arguments for 'expireat' command")
+            res = 1 if redis_store.expireat(str(args[0]), float(args[1])) else 0
+            return {"ok": True, "command": cmd, "result": res}
+
+        elif cmd == "PEXPIREAT":
+            if len(args) != 2:
+                raise RedisError("ERR wrong number of arguments for 'pexpireat' command")
+            res = 1 if redis_store.pexpireat(str(args[0]), int(args[1])) else 0
+            return {"ok": True, "command": cmd, "result": res}
+
+        elif cmd == "TTL":
+            if len(args) != 1:
+                raise RedisError("ERR wrong number of arguments for 'ttl' command")
+            res = redis_store.ttl(str(args[0]))
+            return {"ok": True, "command": cmd, "result": res}
+
+        elif cmd == "PTTL":
+            if len(args) != 1:
+                raise RedisError("ERR wrong number of arguments for 'pttl' command")
+            res = redis_store.pttl(str(args[0]))
+            return {"ok": True, "command": cmd, "result": res}
+
+        elif cmd == "PERSIST":
+            if len(args) != 1:
+                raise RedisError("ERR wrong number of arguments for 'persist' command")
+            res = 1 if redis_store.persist(str(args[0])) else 0
             return {"ok": True, "command": cmd, "result": res}
 
         # ── Hashes ───────────────────────────────────────────────────────────
@@ -399,15 +468,60 @@ def execute_redis_command(req: CommandRequest) -> Dict[str, Any]:
 
     except WrongTypeError as e:
         return {"ok": False, "command": cmd, "error": str(e), "error_type": "WRONGTYPE"}
+    except OOMError as e:
+        return {"ok": False, "command": cmd, "error": str(e), "error_type": "OOM"}
     except RedisError as e:
         return {"ok": False, "command": cmd, "error": str(e), "error_type": "ERR"}
     except Exception as e:
         return {"ok": False, "command": cmd, "error": f"ERR {str(e)}", "error_type": "INTERNAL"}
 
 
+@router.post("/expire")
+def set_key_expiration(req: ExpireRequest) -> Dict[str, Any]:
+    """Set Time-To-Live expiration on a key."""
+    success = redis_store.expire(req.key, req.seconds)
+    return {"key": req.key, "seconds": req.seconds, "success": success}
+
+
+@router.get("/ttl/{key}")
+def get_key_ttl(key: str) -> Dict[str, Any]:
+    """Get remaining TTL in seconds and milliseconds."""
+    ttl_sec = redis_store.ttl(key)
+    ttl_ms = redis_store.pttl(key)
+    return {
+        "key": key,
+        "ttl_seconds": ttl_sec,
+        "ttl_milliseconds": ttl_ms,
+        "has_ttl": ttl_sec >= 0,
+        "is_persistent": ttl_sec == -1,
+        "not_found": ttl_sec == -2,
+    }
+
+
+@router.post("/persist/{key}")
+def persist_key(key: str) -> Dict[str, Any]:
+    """Remove TTL on a key, making it persistent."""
+    success = redis_store.persist(key)
+    return {"key": key, "persisted": success}
+
+
+@router.post("/config/eviction")
+def configure_eviction(req: EvictionConfigRequest) -> Dict[str, Any]:
+    """Configure maximum keys ceiling and memory eviction policy."""
+    try:
+        redis_store.configure_eviction(max_keys=req.max_keys, policy=req.policy)
+        return {
+            "ok": True,
+            "max_keys": redis_store._max_keys,
+            "eviction_policy": redis_store._eviction_policy.value,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/keys")
 def list_keys(pattern: str = Query("*", description="Glob pattern matching keys")) -> Dict[str, Any]:
-    """Retrieve keys matching a pattern with their type and size."""
+    """Retrieve keys matching a pattern with their type, size, and TTL."""
     matched_keys = redis_store.keys(pattern)
     key_details = []
     for k in matched_keys:
@@ -428,6 +542,7 @@ def list_keys(pattern: str = Query("*", description="Glob pattern matching keys"
             "key": k,
             "type": k_type.value,
             "size": size,
+            "ttl": redis_store.ttl(k),
         })
 
     return {
@@ -442,7 +557,7 @@ def inspect_key(key: str) -> Dict[str, Any]:
     """Inspect complete value, structure, and type of any key."""
     k_type = redis_store.type(key)
     if k_type == RedisType.NONE:
-        raise HTTPException(status_code=404, detail=f"Key '{key}' not found")
+        raise HTTPException(status_code=404, detail=f"Key '{key}' not found or expired")
 
     value: Any = None
     size = 0
@@ -466,6 +581,7 @@ def inspect_key(key: str) -> Dict[str, Any]:
         "key": key,
         "type": k_type.value,
         "size": size,
+        "ttl": redis_store.ttl(key),
         "value": value,
     }
 

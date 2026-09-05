@@ -142,6 +142,7 @@ This table maps every original product and technical requirement from **PRD #16 
 | **Phase 28** | **QUIC Low-Latency Transport** | Sub-millisecond multiplexed UDP invalidation bus, stream isolation, zero Head-of-Line blocking | ✅ Complete |
 | **Phase 29** | **AgentDB HNSW & Int8 Quantization** | $O(\log N)$ HNSW multi-layer vector graph index, Int8 Scalar Quantization ($4\times$ memory reduction), Live benchmark & visualizer | ✅ Complete |
 | **Phase 30** | **Redis Data Types Engine** | In-memory store for Strings, Hashes, Lists, Sets, ZSets, `WRONGTYPE` validation, and `/api/redis/*` API | ✅ Complete |
+| **Phase 31** | **TTL & Memory Eviction Engine** | Passive on-access expiration, active background sweeps, LRU/LFU/Volatile-TTL memory pruning | ✅ Complete |
 
 ---
 
@@ -230,7 +231,7 @@ pytest tests/ -v
 ```
 
 ### Test Suite Summary:
-- **122/122 Unit & Integration Tests Passing (100%)**
+- **136/136 Unit & Integration Tests Passing (100%)**
 - Covers:
   - Merkle-DAG ripple integrity and compound commit atomicity.
   - ReBAC authorization and graph anomaly detection.
