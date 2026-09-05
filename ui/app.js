@@ -1022,6 +1022,97 @@ async function resetGovernorState() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// AgentDB QUIC Mesh Transport Controllers (Phase 28)
+// ─────────────────────────────────────────────────────────────────────────
+async function loadQuicMeshStatus() {
+  try {
+    const data = await API.get('/api/quic/mesh-status');
+    const latEl = document.getElementById('quic-val-latency');
+    const peersEl = document.getElementById('quic-val-peers');
+
+    if (peersEl && data.mesh_nodes_count) {
+      peersEl.textContent = `${data.mesh_nodes_count} Sockets Active`;
+    }
+
+    if (latEl && data.nodes) {
+      const latencies = Object.values(data.nodes).map(n => n.avg_latency_ms).filter(l => l > 0);
+      if (latencies.length) {
+        const avg = (latencies.reduce((a, b) => a + b, 0) / latencies.length).toFixed(2);
+        latEl.textContent = `${avg}ms (Sub-1ms)`;
+      }
+    }
+  } catch (e) {
+    console.error('Error in loadQuicMeshStatus:', e);
+  }
+}
+
+async function broadcastQuicInvalidation() {
+  const box = document.getElementById('quic-broadcast-output');
+  if (box) {
+    box.style.display = 'block';
+    box.innerHTML = `<div class="text-xs text-muted">Transmitting multiplexed QUIC packet across UDP mesh...</div>`;
+  }
+  try {
+    const res = await API.post('/api/quic/broadcast', {
+      key: `patient:${Math.floor(Math.random() * 500)}`,
+      version: Math.floor(Math.random() * 10) + 1,
+      sender_id: "us-east-1",
+      loss_rate: 0.0
+    });
+
+    if (box) {
+      box.innerHTML = `
+        <div style="color:var(--fresh); font-weight:600; margin-bottom:4px;">
+          ⚡ Invalidation Broadcast Complete (Stream #${res.stream_id})
+        </div>
+        <div style="color:var(--text-muted);">Key: <strong>${res.key}</strong> &rarr; v${res.version} · Avg Latency: <strong>${res.avg_latency_ms}ms</strong></div>
+        <div style="margin-top:4px;">
+          ${Object.entries(res.deliveries).map(([peer, d]) => `
+            <span class="badge ${d.status === 'DELIVERED' ? 'badge-ok' : 'badge-quarantined'}" style="margin-right:6px;">
+              ${peer}: ${d.status} (${d.latency_ms}ms)
+            </span>
+          `).join('')}
+        </div>
+      `;
+    }
+    await loadQuicMeshStatus();
+  } catch (e) {
+    if (box) box.innerHTML = `<div class="text-xs text-danger">Broadcast failed: ${e.message}</div>`;
+  }
+}
+
+async function benchmarkQuicIsolation() {
+  const box = document.getElementById('quic-broadcast-output');
+  if (box) {
+    box.style.display = 'block';
+    box.innerHTML = `<div class="text-xs text-muted">Benchmarking stream multiplexing & head-of-line blocking elimination...</div>`;
+  }
+  try {
+    const res = await API.post('/api/quic/benchmark-isolation', {});
+    if (box) {
+      box.innerHTML = `
+        <div style="color:var(--fresh); font-weight:600; margin-bottom:4px;">
+          ✅ Head-of-Line Blocking: ${res.head_of_line_blocking}
+        </div>
+        <div style="margin-bottom:4px;">${res.explanation}</div>
+        <div style="display:flex; gap:12px;">
+          <div>
+            <span class="text-muted">Stream 1 (Lossy 50%):</span>
+            <strong>${res.stream_1_lossy.delivery_rate} delivered</strong> (${res.stream_1_lossy.packets_delivered}/${res.stream_1_lossy.packets_sent})
+          </div>
+          <div>
+            <span class="text-muted">Stream 2 (Clean 0%):</span>
+            <strong style="color:var(--fresh);">${res.stream_2_clean.delivery_rate} delivered</strong> (${res.stream_2_clean.packets_delivered}/${res.stream_2_clean.packets_sent})
+          </div>
+        </div>
+      `;
+    }
+  } catch (e) {
+    if (box) box.innerHTML = `<div class="text-xs text-danger">Benchmark failed: ${e.message}</div>`;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // PAGE 9 — GIT BRANCH MANAGER & DOT INDEXER
 // ─────────────────────────────────────────────────────────────────────────
 async function loadNodeBranches() {

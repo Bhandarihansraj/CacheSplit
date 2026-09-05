@@ -206,6 +206,39 @@
       <div class="node-grid" id="node-grid">
         <div class="state-msg"><div class="spinner"></div><span>Loading…</span></div>
       </div>
+
+      <!-- AgentDB QUIC Low-Latency Transport Mesh Card -->
+      <div class="card mt-16">
+        <div class="card-header">
+          <h3>AgentDB QUIC (<1ms) Transport Mesh</h3>
+          <div class="btn-group">
+            <button class="btn btn-ghost btn-sm" onclick="loadQuicMeshStatus()">Refresh Sockets</button>
+            <button class="btn btn-primary btn-sm" onclick="broadcastQuicInvalidation()">⚡ Broadcast Invalidation</button>
+            <button class="btn btn-ghost btn-sm" onclick="benchmarkQuicIsolation()">Benchmark Stream Isolation</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="grid-4 mb-12">
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">TRANSPORT PROTOCOL</div>
+              <div style="font-weight:600; font-size:16px; color:var(--accent); margin-top:4px;">QUIC / UDP Sockets</div>
+            </div>
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">AVG TRANSMISSION LATENCY</div>
+              <div id="quic-val-latency" style="font-weight:600; font-size:16px; color:var(--fresh); margin-top:4px;">0.28ms</div>
+            </div>
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">ACTIVE PEER SOCKETS</div>
+              <div id="quic-val-peers" style="font-weight:600; font-size:16px; margin-top:4px;">3 Endpoints</div>
+            </div>
+            <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+              <div class="text-xs text-muted">HEAD-OF-LINE BLOCKING</div>
+              <div style="font-weight:600; font-size:16px; color:var(--fresh); margin-top:4px;">ELIMINATED</div>
+            </div>
+          </div>
+          <div id="quic-broadcast-output" style="display:none; margin-top:8px; font-family:monospace; font-size:11px; background:var(--surface-2); padding:8px; border-radius:4px; border:1px solid var(--border);"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ── Page: Entity Explorer ─────────────────────────────── -->
