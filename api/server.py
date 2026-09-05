@@ -160,10 +160,17 @@ async def handshake(req: HandshakeRequest):
     return {"status": status}
 
 
+class RegisterRequest(BaseModel):
+    node_id: str
+    region: str
+    tier: str
+    join_token: str
+    parent_node_id: str = None
+
 @app.post("/api/register")
-async def register(node_id: str, region: str, tier: str, join_token: str, parent_node_id: str = None):
-    registry.register_node(node_id, region, tier, parent_node_id, join_token)
-    await node_repo.upsert_node(node_id=node_id, region=region, tier=tier, join_token=join_token)
+async def register(req: RegisterRequest):
+    registry.register_node(req.node_id, req.region, req.tier, req.parent_node_id, req.join_token)
+    await node_repo.upsert_node(node_id=req.node_id, region=req.region, tier=req.tier, join_token=req.join_token)
     return {"status": "registered"}
 
 
@@ -172,13 +179,17 @@ async def get_status(node_id: str):
     return await node_repo.get_node(node_id)
 
 
+class QuarantineRequest(BaseModel):
+    node_id: str
+    reason: str
+
 @app.post("/api/debug/quarantine")
-async def debug_quarantine(node_id: str, reason: str):
-    registry.mark_quarantined(node_id, reason)
-    node = registry.nodes.get(node_id)
-    flags = node.agent_flags if node else [reason]
-    await node_repo.update_node_health(node_id, "quarantined", flags)
-    return {"status": "quarantined", "node_id": node_id}
+async def debug_quarantine(req: QuarantineRequest):
+    registry.mark_quarantined(req.node_id, req.reason)
+    node = registry.nodes.get(req.node_id)
+    flags = node.agent_flags if node else [req.reason]
+    await node_repo.update_node_health(req.node_id, "quarantined", flags)
+    return {"status": "quarantined", "node_id": req.node_id}
 
 
 from core.consistent_hash import HashRing

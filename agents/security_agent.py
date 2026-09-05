@@ -24,7 +24,7 @@ class SecurityAgent:
 
     def __init__(self, model_path: str = "", logger_instance: AccessLogger = None):
         self.model_path = model_path
-        self.logger = logger_instance or AccessLogger()
+        self.logger = logger_instance if logger_instance is not None else AccessLogger()
 
         try:
             from sklearn.ensemble import IsolationForest
@@ -119,9 +119,8 @@ class SecurityAgent:
         # score_samples returns offset where lower = more anomalous
         raw = self.model.score_samples(X)[0]
         # Map to [0, 1]:  score_samples returns values roughly in [-1, 1]
-        # Typical range is about -0.5 to 0.3 for IsolationForest
-        # Map so that low raw → high anomaly score
-        score = 0.5 - raw / (abs(raw) + 1.0)
+        # Linear mapping so anomalies (negative raw) map above 0.5
+        score = 0.5 - raw / 2.0
         return float(max(0.0, min(1.0, score)))
 
     def evaluate(self, event, threshold: float = 0.6) -> bool:
