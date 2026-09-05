@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/branch", tags=["branches"])
 
 # In-memory registry of BranchEngine instances per node_id
 _node_engines: Dict[str, BranchEngine] = {}
+node_branch_engines = _node_engines
 
 
 def get_or_create_engine(node_id: str) -> BranchEngine:

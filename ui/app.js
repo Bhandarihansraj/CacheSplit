@@ -1193,6 +1193,140 @@ async function injectBadDataAudit() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// DHCP Dynamic Discovery & Permissions (Phase 24)
+// ─────────────────────────────────────────────────────────────────────────
+
+async function loadDirectoryCatalog() {
+  try {
+    const catalog = await API.get('/api/discovery/catalog');
+    const perms = await API.get('/api/permissions/list');
+    
+    const statTotal = document.getElementById('dhcp-stat-total');
+    const statPerms = document.getElementById('dhcp-stat-perms');
+    if (statTotal && catalog.total_leases) statTotal.textContent = catalog.total_leases.toLocaleString() + '+';
+    if (statPerms && perms.total !== undefined) statPerms.textContent = perms.total;
+
+    // Trigger sample search
+    searchDhcpDirectory('');
+    loadPermissionRequests();
+  } catch (e) {
+    console.error('Error in loadDirectoryCatalog:', e);
+  }
+}
+
+async function searchDhcpDirectory(query) {
+  const container = document.getElementById('dhcp-search-results');
+  if (!container) return;
+  try {
+    const res = await API.get(`/api/discovery/search?q=${encodeURIComponent(query || 'pat')}&limit=25`);
+    if (!res.results || res.results.length === 0) {
+      container.innerHTML = '<div class="text-xs text-muted">No matching canonical aliases found.</div>';
+      return;
+    }
+    container.innerHTML = `
+      <table style="width:100%; border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border); text-align:left; color:var(--text-muted);">
+            <th style="padding:4px;">Canonical Alias (DHCP)</th>
+            <th style="padding:4px;">Raw ID</th>
+            <th style="padding:4px;">Assigned IP</th>
+            <th style="padding:4px;">Node / Branch</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${res.results.map(r => `
+            <tr style="border-bottom:1px solid var(--border);">
+              <td style="padding:4px; font-weight:600; color:var(--accent);">${r.canonical_alias}</td>
+              <td style="padding:4px;">${r.raw_id}</td>
+              <td style="padding:4px; color:var(--text-muted);">${r.assigned_ip}</td>
+              <td style="padding:4px;">${r.node_id}:${r.branch_name}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (e) {
+    container.innerHTML = `<div class="text-xs text-danger">Error: ${e.message}</div>`;
+  }
+}
+
+async function loadPermissionRequests() {
+  const container = document.getElementById('permission-requests-container');
+  if (!container) return;
+  try {
+    const res = await API.get('/api/permissions/list');
+    if (!res.requests || res.requests.length === 0) {
+      container.innerHTML = '<div class="text-xs text-muted">No cross-node permission requests pending.</div>';
+      return;
+    }
+    container.innerHTML = res.requests.map(req => `
+      <div style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:8px; margin-bottom:8px; background:var(--surface-2);">
+        <div class="row-between mb-4">
+          <strong>${req.requester_id}@${req.requester_node} &rarr; ${req.target_node}:${req.target_branch}</strong>
+          <span class="badge ${req.status === 'APPROVED' ? 'badge-ok' : req.status === 'PENDING' ? 'badge-stale' : 'badge-quarantined'}">
+            ${req.status} [${req.access_level}]
+          </span>
+        </div>
+        <div class="text-xs text-muted mb-4">Reason: ${req.reason}</div>
+        ${req.status === 'PENDING' ? `
+          <div class="btn-group">
+            <button class="btn btn-primary btn-xs" onclick="reviewPermission('${req.request_id}', 'APPROVED')">Approve Lease</button>
+            <button class="btn btn-danger btn-xs" onclick="reviewPermission('${req.request_id}', 'REJECTED')">Reject</button>
+          </div>
+        ` : `<div class="text-xs text-muted">Expires in: ${req.expires_in_s ? req.expires_in_s + 's' : 'Permanent/N/A'}</div>`}
+      </div>
+    `).join('');
+  } catch (e) {
+    container.innerHTML = `<div class="text-xs text-danger">Error: ${e.message}</div>`;
+  }
+}
+
+function openPermissionRequestModal(show = true) {
+  const p = document.getElementById('perm-request-panel');
+  if (p) p.style.display = show ? 'block' : 'none';
+}
+
+async function submitPermissionRequest() {
+  const reqId = document.getElementById('perm-requester-id').value;
+  const reqNode = document.getElementById('perm-requester-node').value;
+  const tgtNode = document.getElementById('perm-target-node').value;
+  const tgtBranch = document.getElementById('perm-target-branch').value;
+  const accLevel = document.getElementById('perm-access-level').value;
+  const reason = document.getElementById('perm-reason').value;
+
+  try {
+    const res = await API.post('/api/permissions/request', {
+      requester_id: reqId,
+      requester_node: reqNode,
+      target_node: tgtNode,
+      target_branch: tgtBranch,
+      access_level: accLevel,
+      reason: reason
+    });
+    alert(`Permission Request ${res.request.request_id} submitted! Status: ${res.request.status}`);
+    openPermissionRequestModal(false);
+    loadPermissionRequests();
+  } catch (e) {
+    alert(`Request failed: ${e.message}`);
+  }
+}
+
+async function reviewPermission(requestId, decision) {
+  try {
+    const res = await API.post('/api/permissions/review', {
+      request_id: requestId,
+      reviewer_id: "node-owner-lead",
+      decision: decision,
+      lease_duration_s: 7200.0
+    });
+    alert(`Request ${requestId} is now ${res.request.status}`);
+    loadPermissionRequests();
+  } catch (e) {
+    alert(`Review failed: ${e.message}`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Bootstrap
 // ─────────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -1208,6 +1342,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (page === 'page-simulator') pollSimSnapshot();
       if (page === 'page-branches')  loadNodeBranches();
       if (page === 'page-audit')     loadAuditTrail();
+      if (page === 'page-directory') loadDirectoryCatalog();
     });
   });
 
@@ -1217,5 +1352,6 @@ document.addEventListener('DOMContentLoaded', () => {
   startPolling();
   setInterval(pollSimSnapshot, 1500);
 });
+
 
 

@@ -28,6 +28,8 @@ from api.developer import router as developer_router
 from api.simulation import router as simulation_router
 from api.branches import router as branch_router, dot_router
 from api.audit import router as audit_router
+from api.discovery import router as discovery_router
+from api.permissions import router as permissions_router
 from services.audit_batcher import audit_batcher
 from services.sync_loop import sync_loop
 from services.raft_node import raft_node
@@ -113,6 +115,8 @@ app.include_router(simulation_router)
 app.include_router(branch_router)
 app.include_router(dot_router)
 app.include_router(audit_router)
+app.include_router(discovery_router)
+app.include_router(permissions_router)
 
 
 

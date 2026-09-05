@@ -53,6 +53,13 @@
         </svg>
         v4 Simulator
       </div>
+      <div class="nav-item" data-page="page-directory" data-label="Master Directory & Permissions">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="8" cy="8" r="6"/>
+          <path d="M8 2v12M2 8h12M4.5 4.5l7 7M11.5 4.5l-7 7"/>
+        </svg>
+        DHCP Directory
+      </div>
     </div>
 
 
@@ -685,6 +692,127 @@
           <div id="audit-table-container" class="scroll-panel" style="max-height:360px;">
             <div class="text-xs text-muted">Loading audit events...</div>
           </div>
+        </div>
+      </div>
+    <!-- ── Page: Master Directory & DHCP Discovery ────────────── -->
+    <div id="page-directory" class="page">
+      <div class="section-header">
+        <div>
+          <h2>DHCP Dynamic Discovery & Cross-Node Permissions</h2>
+          <p>Human-readable canonical alias addressing (no hash memorization) & node-owner permission governance.</p>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary btn-sm" onclick="loadDirectoryCatalog()">Refresh Catalog</button>
+          <button class="btn btn-ghost btn-sm" onclick="openPermissionRequestModal()">+ Request Access</button>
+        </div>
+      </div>
+
+      <div class="grid-4 mb-16">
+        <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+          <div class="text-xs text-muted">TOTAL DHCP LEASES</div>
+          <div id="dhcp-stat-total" style="font-weight:600; font-size:18px; color:var(--accent); margin-top:4px;">30,000+</div>
+        </div>
+        <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+          <div class="text-xs text-muted">CLUSTER NODES ONLINE</div>
+          <div id="dhcp-stat-nodes" style="font-weight:600; font-size:18px; margin-top:4px;">3 Nodes</div>
+        </div>
+        <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+          <div class="text-xs text-muted">ACTIVE PERMISSION LEASES</div>
+          <div id="dhcp-stat-perms" style="font-weight:600; font-size:18px; margin-top:4px;">0</div>
+        </div>
+        <div class="card p-12 text-center" style="background:var(--surface-2); border:1px solid var(--border);">
+          <div class="text-xs text-muted">LAZY POINTER HIT RATIO</div>
+          <div id="dhcp-stat-lazy" style="font-weight:600; font-size:18px; color:var(--accent); margin-top:4px;">100%</div>
+        </div>
+      </div>
+
+      <div class="grid-2 mb-16">
+        <!-- Live DHCP Alias Search -->
+        <div class="card">
+          <div class="card-header">
+            <h3>DHCP Auto-Discovery & Dynamic Resolver</h3>
+          </div>
+          <div class="card-body">
+            <div class="form-group mb-8">
+              <label>Search Canonical Alias, Entity ID, or Category</label>
+              <input id="dhcp-search-input" onkeyup="searchDhcpDirectory(this.value)" placeholder="e.g. cluster.us.east.healthcare, pat_us_east_00042, billing, or telemetry">
+            </div>
+            <div id="dhcp-search-results" class="scroll-panel" style="max-height:220px; font-family:monospace; font-size:11px; background:var(--surface-2); padding:10px; border-radius:var(--radius-sm); border:1px solid var(--border);">
+              <div class="text-xs text-muted">Type to search 30,000+ cluster aliases instantly...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cross-Node Permission Governance -->
+        <div class="card">
+          <div class="card-header">
+            <h3>Cross-Node Access Governance</h3>
+            <span class="badge badge-main">Owner RBAC</span>
+          </div>
+          <div class="card-body">
+            <div class="row-between mb-8">
+              <span class="text-xs text-muted">Node Owner Approval Workflow:</span>
+              <button class="btn btn-ghost btn-sm" onclick="loadPermissionRequests()">Refresh</button>
+            </div>
+            <div id="permission-requests-container" class="scroll-panel" style="max-height:220px; font-family:monospace; font-size:11px;">
+              <div class="text-xs text-muted">Loading permission requests...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Request Access Modal Card (collapsible) -->
+      <div id="perm-request-panel" class="card mb-16" style="display:none;">
+        <div class="card-header">
+          <h3>Submit Cross-Node Permission Request</h3>
+        </div>
+        <div class="card-body">
+          <div class="grid-3 mb-12">
+            <div class="form-group">
+              <label>Requester ID</label>
+              <input id="perm-requester-id" value="dev-sarah" placeholder="e.g. dev-sarah">
+            </div>
+            <div class="form-group">
+              <label>Requester Node</label>
+              <select id="perm-requester-node">
+                <option value="us-east-1">us-east-1</option>
+                <option value="eu-west-1">eu-west-1</option>
+                <option value="asia-south-1">asia-south-1</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Target Node</label>
+              <select id="perm-target-node">
+                <option value="eu-west-1">eu-west-1</option>
+                <option value="us-east-1">us-east-1</option>
+                <option value="asia-south-1">asia-south-1</option>
+              </select>
+            </div>
+          </div>
+          <div class="grid-2 mb-12">
+            <div class="form-group">
+              <label>Target Branch</label>
+              <input id="perm-target-branch" value="dev/cardiology" placeholder="e.g. main, dev/cardiology, dev/billing">
+            </div>
+            <div class="form-group">
+              <label>Access Level</label>
+              <select id="perm-access-level">
+                <option value="READ">READ (Inspect entities)</option>
+                <option value="WRITE">WRITE (Commit mutations)</option>
+                <option value="MERGE">MERGE (Push / Pull branches)</option>
+                <option value="ADMIN">ADMIN (Full Governance)</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group mb-12">
+            <label>Business Justification / Reason</label>
+            <input id="perm-reason" value="Cross-region telemetry sync for cardiology trials" placeholder="State reason for audit compliance">
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-primary btn-sm" onclick="submitPermissionRequest()">Submit Request</button>
+            <button class="btn btn-ghost btn-sm" onclick="openPermissionRequestModal(false)">Cancel</button>
+          </div>
+          <div id="perm-submit-result" class="mt-8"></div>
         </div>
       </div>
     </div>
