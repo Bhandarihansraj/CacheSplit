@@ -103,6 +103,13 @@
         </svg>
         Audit Trail
       </div>
+      <div class="nav-item" data-page="page-semantic" data-label="AgentDB Semantic Cache">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 4a2 2 0 012-2h8a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V4z"/>
+          <path d="M6 8h4M8 6v4"/>
+        </svg>
+        Semantic Vector Lab
+      </div>
       <div class="nav-item" data-page="page-security" data-label="Security">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
           <path d="M8 2L13 4V9C13 12 8 14 8 14S3 12 3 9V4L8 2Z"/>
@@ -817,6 +824,105 @@
             <button class="btn btn-ghost btn-sm" onclick="openPermissionRequestModal(false)">Cancel</button>
           </div>
           <div id="perm-submit-result" class="mt-8"></div>
+        </div>
+      </div>
+    <!-- ── Semantic Vector Lab Page ────────────────────────────────── -->
+    <div class="page" id="page-semantic">
+      <div class="card mb-16">
+        <div class="card-header">
+          <h3>AgentDB Semantic Vector Cache Engine</h3>
+          <div class="btn-group">
+            <button class="btn btn-ghost btn-sm" onclick="seedSemanticDemo()">Re-Seed Demo Vectors</button>
+            <button class="btn btn-primary btn-sm" onclick="refreshSemanticStats()">Refresh Stats</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="stats-row mb-16" style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div class="stat-box" style="flex:1;min-width:120px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Indexed Vectors</div>
+              <div id="sem-stat-entries" style="font-size:20px;font-weight:600;">—</div>
+            </div>
+            <div class="stat-box" style="flex:1;min-width:120px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Vector Dimension</div>
+              <div id="sem-stat-dim" style="font-size:20px;font-weight:600;">—</div>
+            </div>
+            <div class="stat-box" style="flex:1;min-width:120px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Semantic Hit Rate</div>
+              <div id="sem-stat-hitrate" style="font-size:20px;font-weight:600;color:var(--accent);">—</div>
+            </div>
+            <div class="stat-box" style="flex:1;min-width:120px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:6px;">
+              <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;">Avg Latency</div>
+              <div id="sem-stat-latency" style="font-size:20px;font-weight:600;">—</div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+            <!-- Query Sandbox -->
+            <div class="card" style="margin-bottom:0;">
+              <div class="card-header">
+                <h4>Hybrid Semantic Query Sandbox</h4>
+              </div>
+              <div class="card-body">
+                <div class="form-group mb-8">
+                  <label>Query Vector (comma-separated float array)</label>
+                  <input id="sem-query-vec" value="0.92, 0.15, 0.05, 0.22, 0.81, 0.11, 0.04, 0.33" style="font-family:var(--font-mono);font-size:12px;">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" class="mb-8">
+                  <div class="form-group">
+                    <label>Metric</label>
+                    <select id="sem-query-metric">
+                      <option value="cosine">Cosine Similarity</option>
+                      <option value="euclidean">Euclidean (L2)</option>
+                      <option value="dot">Dot Product</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>Top-K</label>
+                    <input id="sem-query-k" type="number" value="3" min="1" max="10">
+                  </div>
+                </div>
+                <div class="form-group mb-8">
+                  <label>Metadata Filter JSON (Optional, e.g. {"domain":"security"})</label>
+                  <input id="sem-query-filter" placeholder='{"domain":"security"}' style="font-family:var(--font-mono);font-size:12px;">
+                </div>
+                <div style="display:flex;align-items:center;gap:12px;" class="mb-12">
+                  <label style="margin:0;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                    <input type="checkbox" id="sem-query-mmr"> Enable MMR Diversification
+                  </label>
+                  <span style="font-size:12px;color:var(--text-muted);">Lambda:</span>
+                  <input id="sem-query-lambda" type="range" min="0" max="1" step="0.1" value="0.5" style="width:80px;">
+                  <span id="sem-lambda-val" style="font-size:12px;font-family:var(--font-mono);">0.5</span>
+                </div>
+                <button class="btn btn-primary btn-sm" onclick="runSemanticQuery()">Execute Semantic Query</button>
+                <div id="sem-query-result" class="mt-12" style="max-height:220px;overflow-y:auto;"></div>
+              </div>
+            </div>
+
+            <!-- Neighborhood Invalidation Sandbox -->
+            <div class="card" style="margin-bottom:0;">
+              <div class="card-header">
+                <h4>Semantic Neighborhood Invalidator</h4>
+              </div>
+              <div class="card-body">
+                <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+                  Invalidate an entire semantic cluster of cached items based on vector distance radius without knowing exact primary keys.
+                </p>
+                <div class="form-group mb-8">
+                  <label>Pivot Vector</label>
+                  <input id="sem-inval-vec" value="0.92, 0.15, 0.05, 0.22, 0.81, 0.11, 0.04, 0.33" style="font-family:var(--font-mono);font-size:12px;">
+                </div>
+                <div class="form-group mb-8">
+                  <label>Radius Similarity Threshold (>=)</label>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <input id="sem-inval-radius" type="range" min="0.5" max="1.0" step="0.05" value="0.85" style="flex:1;" oninput="document.getElementById('sem-radius-val').textContent=this.value">
+                    <span id="sem-radius-val" style="font-size:12px;font-family:var(--font-mono);min-width:32px;">0.85</span>
+                  </div>
+                </div>
+                <button class="btn btn-danger btn-sm" onclick="runNeighborhoodInvalidation()">Invalidate Semantic Cluster</button>
+                <div id="sem-inval-result" class="mt-12" style="max-height:220px;overflow-y:auto;"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

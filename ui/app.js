@@ -1327,9 +1327,151 @@ async function reviewPermission(requestId, decision) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// PAGE 11 — AGENTDB SEMANTIC VECTOR CACHE (Phase 25)
+// ─────────────────────────────────────────────────────────────────────────
+
+async function refreshSemanticStats() {
+  try {
+    const stats = await API.get('/semantic/stats');
+    const elEntries = document.getElementById('sem-stat-entries');
+    const elDim = document.getElementById('sem-stat-dim');
+    const elHitRate = document.getElementById('sem-stat-hitrate');
+    const elLatency = document.getElementById('sem-stat-latency');
+    if (elEntries) elEntries.textContent = stats.total_entries || 0;
+    if (elDim) elDim.textContent = stats.dimension ? `${stats.dimension}-D` : '—';
+    if (elHitRate) elHitRate.textContent = `${((stats.hit_rate || 0) * 100).toFixed(1)}%`;
+    if (elLatency) elLatency.textContent = `${stats.avg_latency_ms || 0}ms`;
+  } catch (e) {
+    console.error('Failed to refresh semantic stats:', e);
+  }
+}
+
+async function runSemanticQuery() {
+  const vecStr = document.getElementById('sem-query-vec').value.trim();
+  const metric = document.getElementById('sem-query-metric').value;
+  const k = parseInt(document.getElementById('sem-query-k').value, 10) || 3;
+  const filterStr = document.getElementById('sem-query-filter').value.trim();
+  const useMmr = document.getElementById('sem-query-mmr').checked;
+  const mmrLambda = parseFloat(document.getElementById('sem-query-lambda').value) || 0.5;
+  const resultBox = document.getElementById('sem-query-result');
+
+  let vector = [];
+  try {
+    vector = vecStr.split(',').map(s => parseFloat(s.trim()));
+    if (vector.some(isNaN)) throw new Error("Invalid float format");
+  } catch (err) {
+    resultBox.innerHTML = `<div class="text-xs text-danger">Error: Vector must be comma-separated numbers</div>`;
+    return;
+  }
+
+  let filters = null;
+  if (filterStr) {
+    try {
+      filters = JSON.parse(filterStr);
+    } catch (err) {
+      resultBox.innerHTML = `<div class="text-xs text-danger">Error: Invalid filter JSON format</div>`;
+      return;
+    }
+  }
+
+  resultBox.innerHTML = `<div class="text-xs text-muted">Executing vector similarity search...</div>`;
+
+  try {
+    const res = await API.post('/semantic/query', {
+      query_vector: vector,
+      k: k,
+      metric: metric,
+      filters: filters,
+      use_mmr: useMmr,
+      mmr_lambda: mmrLambda
+    });
+
+    resultBox.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:4px;padding:8px;background:var(--surface-2);font-family:var(--font-mono);font-size:11px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <strong>STATUS: <span style="color:${res.status === 'CACHE_HIT' ? 'var(--fresh)' : 'var(--danger)'};">${res.status}</span></strong>
+          <span>Latency: ${res.latency_ms}ms</span>
+        </div>
+        ${res.results.map(r => `
+          <div style="border-top:1px solid var(--border);padding-top:4px;margin-top:4px;">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="color:var(--accent);font-weight:600;">${r.key} (v${r.version})</span>
+              <span class="badge badge-ok">${r.similarity} (${metric})</span>
+            </div>
+            <div style="color:var(--text-muted);font-size:10px;">Data: ${JSON.stringify(r.data)}</div>
+            <div style="color:var(--text-muted);font-size:10px;">Meta: ${JSON.stringify(r.metadata)}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    refreshSemanticStats();
+  } catch (e) {
+    resultBox.innerHTML = `<div class="text-xs text-danger">Query failed: ${e.message}</div>`;
+  }
+}
+
+async function runNeighborhoodInvalidation() {
+  const vecStr = document.getElementById('sem-inval-vec').value.trim();
+  const radius = parseFloat(document.getElementById('sem-inval-radius').value) || 0.85;
+  const resultBox = document.getElementById('sem-inval-result');
+
+  let vector = [];
+  try {
+    vector = vecStr.split(',').map(s => parseFloat(s.trim()));
+    if (vector.some(isNaN)) throw new Error("Invalid float format");
+  } catch (err) {
+    resultBox.innerHTML = `<div class="text-xs text-danger">Error: Vector must be comma-separated numbers</div>`;
+    return;
+  }
+
+  resultBox.innerHTML = `<div class="text-xs text-muted">Calculating neighborhood similarity radius...</div>`;
+
+  try {
+    const res = await API.post('/semantic/invalidate-neighborhood', {
+      pivot_vector: vector,
+      radius_similarity: radius,
+      metric: 'cosine'
+    });
+
+    resultBox.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:4px;padding:8px;background:var(--surface-2);font-family:var(--font-mono);font-size:11px;">
+        <div style="color:var(--danger);font-weight:600;margin-bottom:4px;">
+          ⚠️ Invalidated ${res.invalidated_count} cache entries (Radius >= ${res.radius_threshold})
+        </div>
+        <ul style="margin:0;padding-left:16px;">
+          ${res.invalidated_keys.map(k => `<li>${k} (sim: ${res.similarity_scores[k]}) &rarr; <span style="color:var(--danger)">STALE</span></li>`).join('')}
+        </ul>
+      </div>
+    `;
+    refreshSemanticStats();
+  } catch (e) {
+    resultBox.innerHTML = `<div class="text-xs text-danger">Invalidation failed: ${e.message}</div>`;
+  }
+}
+
+async function seedSemanticDemo() {
+  try {
+    await API.post('/semantic/seed', {});
+    alert("Semantic demo vectors seeded successfully!");
+    refreshSemanticStats();
+  } catch (e) {
+    alert(`Seed failed: ${e.message}`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Bootstrap
 // ─────────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // MMR slider listener
+  const lambdaSlider = document.getElementById('sem-query-lambda');
+  if (lambdaSlider) {
+    lambdaSlider.addEventListener('input', (e) => {
+      const valEl = document.getElementById('sem-lambda-val');
+      if (valEl) valEl.textContent = e.target.value;
+    });
+  }
+
   // Nav wiring
   document.querySelectorAll('.nav-item').forEach(item => {
     item.addEventListener('click', () => {
@@ -1343,6 +1485,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (page === 'page-branches')  loadNodeBranches();
       if (page === 'page-audit')     loadAuditTrail();
       if (page === 'page-directory') loadDirectoryCatalog();
+      if (page === 'page-semantic')  refreshSemanticStats();
     });
   });
 

@@ -30,6 +30,7 @@ from api.branches import router as branch_router, dot_router
 from api.audit import router as audit_router
 from api.discovery import router as discovery_router
 from api.permissions import router as permissions_router
+from api.semantic import router as semantic_router
 from services.audit_batcher import audit_batcher
 from services.sync_loop import sync_loop
 from services.raft_node import raft_node
@@ -117,6 +118,7 @@ app.include_router(dot_router)
 app.include_router(audit_router)
 app.include_router(discovery_router)
 app.include_router(permissions_router)
+app.include_router(semantic_router)
 
 
 

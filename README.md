@@ -77,6 +77,8 @@ CacheSplit is a distributed caching prototype and simulation engine built with *
 | [`dot_indexer.py`](file:///D:/myonsite/CacheSplit/core/dot_indexer.py) | Hierarchical dot-notation path resolver (e.g. `nodes.us-east-1.branches.main.merkle_root`). |
 | [`lazy_cache.py`](file:///D:/myonsite/CacheSplit/core/lazy_cache.py) | Lightweight 32-byte hash pointer cache with lazy on-demand payload hydration from SQLite. |
 | [`consistent_hash.py`](file:///D:/myonsite/CacheSplit/core/consistent_hash.py) | Hash ring with virtual nodes for partition placement and shard balancing. |
+| [`semantic_cache.py`](file:///D:/myonsite/CacheSplit/core/semantic_cache.py) | AgentDB-inspired vector store with Cosine/Euclidean/Dot metrics, hybrid metadata filters, and MMR. |
+| [`semantic_invalidation.py`](file:///D:/myonsite/CacheSplit/core/semantic_invalidation.py) | Semantic neighborhood invalidator broadcasting cluster invalidations based on distance radius. |
 | [`rebac.py`](file:///D:/myonsite/CacheSplit/core/rebac.py) | Relationship-Based Access Control evaluator over relational graph edges. |
 | [`stampede_limiter.py`](file:///D:/myonsite/CacheSplit/core/stampede_limiter.py) | Token-bucket rate limiter preventing upstream origin overload. |
 | [`simulation_engine.py`](file:///D:/myonsite/CacheSplit/core/simulation_engine.py) | Lossy network simulation and convergence engine for cache stampede scenarios. |
@@ -85,6 +87,7 @@ CacheSplit is a distributed caching prototype and simulation engine built with *
 | Module | Purpose |
 |---|---|
 | [`cache_store.py`](file:///D:/myonsite/CacheSplit/services/cache_store.py) | Regional cache store coordinating Merkle DAG operations with SQLite persistence. |
+| [`semantic_router.py`](file:///D:/myonsite/CacheSplit/services/semantic_router.py) | Semantic router intercepting queries, computing hit/miss scores, and managing access telemetry. |
 | [`registry.py`](file:///D:/myonsite/CacheSplit/services/registry.py) | Node registration, heartbeat monitoring, and failure injection testing. |
 | [`audit_batcher.py`](file:///D:/myonsite/CacheSplit/services/audit_batcher.py) | Async ring buffer with micro-batched vectorized database flush ($500$ events / $100\text{ms}$). |
 | [`audit_trail_service.py`](file:///D:/myonsite/CacheSplit/services/audit_trail_service.py) | Query service for compliance logs with bad-data and risk filters. |
@@ -98,8 +101,25 @@ CacheSplit is a distributed caching prototype and simulation engine built with *
 |---|---|
 | [`audit_ml_verifier.py`](file:///D:/myonsite/CacheSplit/agents/audit_ml_verifier.py) | Structural validator (`is_bad_data`) and Isolation Forest risk scoring engine. |
 | [`graph_security_agent.py`](file:///D:/myonsite/CacheSplit/agents/graph_security_agent.py) | Relational traversal inspector flagging orphan records and unauthorized cross-region reads. |
-| [`reconciliation_agent.py`](file:///D:/myonsite/CacheSplit/agents/reconciliation_agent.py) | State reconciliation comparing node commit hashes and detecting stale vs tampered nodes. |
-| [`security_agent.py`](file:///D:/myonsite/CacheSplit/agents/security_agent.py) | Feature-vector access anomaly classifier for unexpected querying behavior. |
+| [`security_agent.py`](file:///D:/myonsite/CacheSplit/agents/security_agent.py) | Behavioral anomaly detector monitoring mutation patterns and request velocity. |
+| [`reconciliation_agent.py`](file:///D:/myonsite/CacheSplit/agents/reconciliation_agent.py) | Hash chain verification agent identifying stale or tampered node states. |
+
+---
+
+## 📈 Completed Development Phases
+
+| Phase | Title | Key Deliverables | Status |
+|---|---|---|---|
+| **Phase 0–2** | **Core Foundation** | Hash chain verification, Node Registry, Debounce coalescing, SQLite adapter | ✅ Complete |
+| **Phase 3–8** | **Merkle DAG & ReBAC** | Relational entity trees, Compound Commits, ReBAC BFS authorization | ✅ Complete |
+| **Phase 9–11** | **Real-Time & OCC** | WebSocket live synchronization, Optimistic Concurrency Control, Conflict detection | ✅ Complete |
+| **Phase 12–14** | **Handshake & Commit Lab** | Device version handshake, multi-domain schemas (User/Payment), Commit Lab UI | ✅ Complete |
+| **Phase 15–17** | **Sync & CLI Demo** | Background sync loop, Nmap-style entity scanner, Interactive terminal CLI | ✅ Complete |
+| **Phase 18–21** | **Raft & Sharding** | Raft consensus terms, Consistent hash ring, Write-behind queue, Developer API | ✅ Complete |
+| **Phase 22** | **Stampede Recovery** | Token-bucket capacity ceiling, Lossy network simulator, Recovery convergence | ✅ Complete |
+| **Phase 23** | **Git Branching & Audit** | Node branch engine (`commit`, `push`, `pull`, `restore`), Dot indexer, Audit batcher | ✅ Complete |
+| **Phase 24** | **10K+ Scaler & DHCP** | 30,000+ entity seeder, DHCP dynamic addressing, Cross-node permission governance | ✅ Complete |
+| **Phase 25** | **AgentDB Semantic Cache** | Vector indexing (Cosine/Euclidean/Dot), Hybrid metadata filters, MMR diversity, Semantic neighborhood invalidator | ✅ Complete |
 
 ### 4. API & User Interface (`api/` & `ui/`)
 - **FastAPI Endpoints**: Full CRUD and execution routers mounted in [`api/server.py`](file:///D:/myonsite/CacheSplit/api/server.py).
