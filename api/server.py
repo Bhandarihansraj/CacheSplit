@@ -34,6 +34,7 @@ from api.semantic import router as semantic_router
 from api.governor import router as governor_router
 from api.quic import router as quic_router
 from api.hnsw import router as hnsw_router
+from api.redis_api import router as redis_router
 from services.audit_batcher import audit_batcher
 from services.sync_loop import sync_loop
 from services.raft_node import raft_node
@@ -126,6 +127,7 @@ app.include_router(semantic_router, prefix="/api")
 app.include_router(governor_router)
 app.include_router(quic_router)
 app.include_router(hnsw_router)
+app.include_router(redis_router)
 
 
 
