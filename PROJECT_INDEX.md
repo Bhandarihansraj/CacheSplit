@@ -1,11 +1,11 @@
-# PROJECT INDEX: CacheSplit v3
+# PROJECT INDEX: CacheSplit v4
 > This document is the Single Source of Truth (SSoT) for the CacheSplit project. Read this before touching any code.
 
 ## 1. Project Identity
 - **Name:** CacheSplit
-- **Type:** Secure Distributed Commit-Cache Platform (v3)
+- **Type:** Secure Distributed Commit-Cache Platform (v4)
 - **Stack:** Python, FastAPI, asyncio, Pydantic, uv, TailwindCSS/HTML (UI)
-- **Status:** Execution Phase (Phases 0-10 being implemented)
+- **Status:** All phases 0-21 complete. v4 evolution in progress (commitcache module).
 
 ## 2. Architecture & Design Rules
 - **Core Principle:** Provable deterministic verification for commits (Phase 0).
@@ -18,6 +18,7 @@
 - **UI:** Anthropic Design System (Newsreader serif + Inter), live Merkle DAG inspector, interactive live mutator, compound commit form, ReBAC access tester, and node failure/recovery toggles.
 
 ## 3. Directory Structure
+- `commitcache/`: v4 Commit Cache module -- sub-packages for `api/`, `coordination/`, `core/`, `infra/`, `metering/`, `observability/`.
 - `core/`: Immutable core logic, Commit schema, Hash verification, Access Control, `merkle_dag.py`, `compound_commit.py`, `rebac.py`, `tenant_config.py`.
 - `services/`: Node Registry, Debounce / SingleFlight, `cache_store.py` (high-volume regional cache fabric).
 - `agents/`: Security Agent (Isolation Forest), Reconciliation Agent, `graph_security_agent.py`.
@@ -36,4 +37,6 @@
 - [x] **Phase 11 (State Management):** Optimistic Concurrency Control (OCC), WebSocket Real-Time Sync, and Session Presence.
 - [x] **Phases 12-14 (Real-World Ops & Domains):** Device-Style Node Handshake, User & Payment Services, Interactive Commit Lab.
 - [x] **Phases 15-17 (Cache Sync & Operations):** Eventual Consistency Sync Loop, Nmap-style Cluster Scanner, Menu-Driven CLI Demo.
+- [x] **Phases 18-21 (Raft Consensus, Sharding, Write-Behind, Developer API):** Complete.
 - [x] **Interactive Operations Console:** Live interactive dashboard at `http://127.0.0.1:8000/`.
+- [ ] **Phase 22+ (v4 Evolution):** `commitcache/` module skeleton created. API endpoints refactored to use Pydantic request models. Security agent scoring and logging updated. In progress.

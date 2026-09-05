@@ -1,4 +1,4 @@
-# CacheSplit v3
+# CacheSplit v4
 **Elite Distributed Merkle-DAG Cache Platform -- Planet Scale**
 
 CacheSplit is a production-grade distributed cache fabric with cryptographic Merkle DAG integrity,
@@ -27,6 +27,8 @@ API Key: `cs_live_55464b6bedb94e77b6444fe49c2e4a2c`
 | GET  | /api/sharding/locate/{entity_id} | Hash ring node lookup |
 | GET  | /api/dashboard/node-map | Cluster node status |
 | GET  | /api/dashboard/commits/recent | Recent commit log |
+| POST | /api/register | Register a node (JSON body) |
+| POST | /api/debug/quarantine | Quarantine a node (JSON body) |
 
 ### Python Example
 
@@ -52,10 +54,12 @@ print(r.json())
 | 12-14 | Device Handshake, User/Payment Domains, Commit Lab UI | Complete |
 | 15-17 | Sync Loop, Nmap Scanner, Menu-Driven CLI | Complete |
 | 18-21 | Raft Consensus, Consistent Hashing, Write-Behind Sync, Developer API | Complete |
+| 22+   | v4 Evolution -- commitcache module, API model refactoring | In Progress |
 
 ## Directory Structure
 
 ```
+commitcache/ v4 Commit Cache module (api, coordination, core, infra, metering, observability)
 api/       FastAPI routes (dashboard, query, scanner, developer, raft)
 core/      Merkle DAG, Compound Commits, ReBAC, Consistent Hash
 services/  Registry, Cache Store, Sync Loop, Raft Node, Write-Behind
