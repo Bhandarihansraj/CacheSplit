@@ -118,6 +118,24 @@
       </div>
     </div>
 
+    <div class="nav-section">
+      <div class="nav-section-label">Redis Engine</div>
+      <div class="nav-item" data-page="page-redis" data-label="Redis Explorer & CLI">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="3" width="12" height="10" rx="2"/>
+          <path d="M5 7h6M5 10h4"/>
+        </svg>
+        Redis Explorer
+      </div>
+      <div class="nav-item" data-page="page-pubsub-locks" data-label="Pub/Sub & Redlock Studio">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="8" cy="8" r="3"/>
+          <path d="M3 8a5 5 0 0110 0M1 8a7 7 0 0114 0"/>
+        </svg>
+        Pub/Sub & Locks
+      </div>
+    </div>
+
 
     <div class="sidebar-footer">
       <div class="status-pill">
@@ -1111,6 +1129,237 @@
                   <div class="text-xs text-muted">Loading graph statistics...</div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────────────────────────────────────────────── -->
+    <!-- PAGE: REDIS EXPLORER & CLI (Phase 30 & 31)                  -->
+    <!-- ──────────────────────────────────────────────────────────── -->
+    <div id="page-redis" class="page">
+      <div class="header-row">
+        <div>
+          <h2>Redis In-Memory Engine & Explorer</h2>
+          <p class="subtitle">Real-time Data Structures, TTL Key Expiration & Memory Eviction Controls</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary btn-sm" onclick="loadRedisKeys()">Refresh Keys</button>
+          <button class="btn btn-ghost btn-sm" onclick="flushRedisDb()">Flush DB</button>
+        </div>
+      </div>
+
+      <!-- Stats Bar -->
+      <div class="metrics-grid mb-16" id="redis-stats-cards">
+        <div class="metric-card">
+          <div class="metric-label">Total Keys</div>
+          <div class="metric-val" id="redis-stat-keys">—</div>
+          <div class="metric-sub" id="redis-stat-types">Strings: 0 | Hashes: 0 | Lists: 0 | Sets: 0 | ZSets: 0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Hit Rate</div>
+          <div class="metric-val" id="redis-stat-hitrate">—%</div>
+          <div class="metric-sub" id="redis-stat-hits-misses">Hits: 0 · Misses: 0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Eviction Policy</div>
+          <div class="metric-val" id="redis-stat-policy">noeviction</div>
+          <div class="metric-sub" id="redis-stat-evictions">Evicted: 0 · Expired: 0</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Total Commands Executed</div>
+          <div class="metric-val" id="redis-stat-cmds">—</div>
+          <div class="metric-sub">Thread-safe In-Memory Engine</div>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <!-- Left: Key Explorer & Inspector -->
+        <div class="card">
+          <div class="card-header">
+            <h4>Key Browser & Inspector</h4>
+            <div class="flex items-center gap-8">
+              <input type="text" id="redis-key-search" placeholder="Filter keys (e.g. user:*)" style="width:160px; padding:4px 8px; font-size:12px;" oninput="filterRedisKeysList()">
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-container scroll-panel" style="max-height:260px; margin-bottom:12px;">
+              <table class="table" style="font-size:12px;">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Type</th>
+                    <th>Size</th>
+                    <th>TTL</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="redis-keys-table-body">
+                  <tr><td colspan="5" class="text-center text-muted">Loading Redis keys...</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Value Inspector Card -->
+            <div style="background:var(--surface-2); padding:10px; border-radius:var(--radius-sm); font-size:12px;">
+              <div class="flex items-center justify-between mb-8">
+                <strong id="redis-inspect-key-name">Select a key to inspect payload</strong>
+                <span class="badge badge-neutral" id="redis-inspect-type-badge">NONE</span>
+              </div>
+              <pre id="redis-inspect-content" style="background:#18180F; color:#A8E6CF; padding:8px; border-radius:4px; font-size:11px; max-height:160px; overflow-y:auto; margin:0;">// Key payload details will render here</pre>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: CLI Terminal & Eviction Config -->
+        <div>
+          <!-- CLI Console -->
+          <div class="card mb-16">
+            <div class="card-header">
+              <h4>Interactive Redis Command Terminal</h4>
+            </div>
+            <div class="card-body">
+              <div class="form-group mb-8">
+                <div class="flex gap-8">
+                  <input type="text" id="redis-cli-input" placeholder="e.g. SET user:1 'Alice' or HSET profile name 'Hansraj' or ZADD scores 100 'p1'" style="font-family:monospace; font-size:12px;" onkeydown="if(event.key==='Enter')executeRedisCliCommand()">
+                  <button class="btn btn-primary btn-sm" onclick="executeRedisCliCommand()">Run</button>
+                </div>
+              </div>
+              <div class="flex gap-8 mb-8" style="font-size:11px; flex-wrap:wrap;">
+                <span class="text-muted">Quick presets:</span>
+                <a href="javascript:void(0)" onclick="setRedisPreset('SET greeting \'Hello CacheSplit Redis\'')">SET string</a> ·
+                <a href="javascript:void(0)" onclick="setRedisPreset('HSET user:100 name \'Hansraj\' role \'Architect\'')">HSET hash</a> ·
+                <a href="javascript:void(0)" onclick="setRedisPreset('LPUSH job_queue \'task_alpha\' \'task_beta\'')">LPUSH list</a> ·
+                <a href="javascript:void(0)" onclick="setRedisPreset('SADD clusters \'us-east\' \'eu-west\'')">SADD set</a> ·
+                <a href="javascript:void(0)" onclick="setRedisPreset('ZADD leaderboard 250 \'bob\' 180 \'alice\'')">ZADD zset</a> ·
+                <a href="javascript:void(0)" onclick="setRedisPreset('EXPIRE greeting 60')">EXPIRE</a>
+              </div>
+              <div id="redis-cli-output" class="scroll-panel" style="background:#18180F; color:#ECEFF4; padding:10px; font-family:monospace; font-size:11px; border-radius:var(--radius-sm); min-height:140px; max-height:180px;">
+                <div class="text-muted">// Ready. Enter any standard Redis command above.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Eviction & Memory Settings -->
+          <div class="card" style="margin-bottom:0;">
+            <div class="card-header">
+              <h4>Memory Ceiling & Eviction Configuration</h4>
+            </div>
+            <div class="card-body">
+              <div class="grid grid-2 gap-8 mb-8">
+                <div class="form-group">
+                  <label style="font-size:11px;">Max Keys Ceiling (0 = unlimited)</label>
+                  <input type="number" id="redis-config-maxkeys" value="1000" min="0" style="font-size:12px;">
+                </div>
+                <div class="form-group">
+                  <label style="font-size:11px;">Eviction Policy</label>
+                  <select id="redis-config-policy" style="font-size:12px;">
+                    <option value="noeviction">noeviction (Strict Error)</option>
+                    <option value="allkeys-lru">allkeys-lru (Least Recently Used)</option>
+                    <option value="volatile-lru">volatile-lru (LRU on TTL keys)</option>
+                    <option value="allkeys-lfu">allkeys-lfu (Least Frequently Used)</option>
+                    <option value="volatile-lfu">volatile-lfu (LFU on TTL keys)</option>
+                    <option value="volatile-ttl">volatile-ttl (Shortest Remaining TTL)</option>
+                    <option value="allkeys-random">allkeys-random (Random Key)</option>
+                  </select>
+                </div>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="saveRedisEvictionConfig()">Save Eviction Settings</button>
+              <span id="redis-eviction-save-status" class="text-xs text-muted ml-8"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────────────────────────────────────────────── -->
+    <!-- PAGE: PUB/SUB & REDLOCK STUDIO (Phase 32)                   -->
+    <!-- ──────────────────────────────────────────────────────────── -->
+    <div id="page-pubsub-locks" class="page">
+      <div class="header-row">
+        <div>
+          <h2>Pub/Sub Studio & Distributed Redlock Locks</h2>
+          <p class="subtitle">Multi-Channel Real-Time Broadcasting & Atomic Quorum Mutex Governance</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-secondary btn-sm" onclick="refreshPubSubAndLocks()">Refresh State</button>
+        </div>
+      </div>
+
+      <div class="grid grid-2">
+        <!-- Left: Pub/Sub Broadcast & Real-Time Feed -->
+        <div class="card">
+          <div class="card-header">
+            <h4>Pub/Sub Real-Time Channel Studio</h4>
+            <span class="badge badge-ok" id="pubsub-active-subs-badge">0 Subscribers</span>
+          </div>
+          <div class="card-body">
+            <!-- Publish Form -->
+            <div class="form-group mb-8">
+              <label style="font-size:11px;">Broadcast to Channel</label>
+              <div class="flex gap-8">
+                <input type="text" id="pubsub-channel-input" placeholder="e.g. system:alerts" value="system:alerts" style="width:140px; font-size:12px;">
+                <input type="text" id="pubsub-msg-input" placeholder="Message payload (JSON or text)" style="flex:1; font-size:12px;" onkeydown="if(event.key==='Enter')publishUiMessage()">
+                <button class="btn btn-primary btn-sm" onclick="publishUiMessage()">Publish</button>
+              </div>
+            </div>
+
+            <!-- Subscription Simulator -->
+            <div class="flex items-center gap-8 mb-12 p-8" style="background:var(--surface-2); border-radius:var(--radius-sm); font-size:11px;">
+              <span>Simulated Client:</span>
+              <input type="text" id="pubsub-client-id" value="ui-browser-client" style="width:120px; font-size:11px; padding:2px 6px;">
+              <input type="text" id="pubsub-sub-channels" value="system:*, news.*" style="flex:1; font-size:11px; padding:2px 6px;">
+              <button class="btn btn-ghost btn-xs" onclick="subscribeUiClient()">Subscribe</button>
+            </div>
+
+            <!-- Live Message Stream -->
+            <div class="card-header p-0 mb-8">
+              <h5 style="margin:0; font-size:12px;">Live Message Feed</h5>
+              <button class="btn btn-ghost btn-xs" onclick="clearPubSubFeed()">Clear Feed</button>
+            </div>
+            <div id="pubsub-feed-container" class="scroll-panel" style="background:#18180F; color:#ECEFF4; padding:10px; font-family:monospace; font-size:11px; border-radius:var(--radius-sm); min-height:180px; max-height:220px;">
+              <div class="text-muted">// Subscribed messages and broadcast receipts will appear here in real time...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Distributed Redlock Mutex -->
+        <div class="card">
+          <div class="card-header">
+            <h4>Distributed Redlock Mutex Inspector</h4>
+            <span class="badge badge-neutral" id="redlock-count-badge">0 Active Locks</span>
+          </div>
+          <div class="card-body">
+            <!-- Acquire Lock Form -->
+            <div class="p-8 mb-12" style="background:var(--surface-2); border-radius:var(--radius-sm);">
+              <div class="form-group mb-8">
+                <label style="font-size:11px;">Acquire Mutex Lock</label>
+                <div class="flex gap-8">
+                  <input type="text" id="lock-resource-input" placeholder="Resource Name (e.g. order:1001)" style="flex:1; font-size:12px;">
+                  <input type="number" id="lock-ttl-input" value="10000" placeholder="TTL ms" style="width:90px; font-size:12px;">
+                  <button class="btn btn-primary btn-sm" onclick="acquireUiLock()">Acquire Lock</button>
+                </div>
+              </div>
+              <div id="lock-acquire-result" class="text-xs text-muted"></div>
+            </div>
+
+            <!-- Active Locks Table -->
+            <h5 style="margin:0 0 8px 0; font-size:12px;">Active Cluster Locks</h5>
+            <div class="table-container scroll-panel" style="max-height:200px;">
+              <table class="table" style="font-size:12px;">
+                <thead>
+                  <tr>
+                    <th>Resource</th>
+                    <th>Owner Token</th>
+                    <th>Remaining TTL</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="redlock-table-body">
+                  <tr><td colspan="4" class="text-center text-muted">No active distributed locks</td></tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

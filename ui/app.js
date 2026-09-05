@@ -1836,6 +1836,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (page === 'page-audit')     loadAuditTrail();
       if (page === 'page-directory') loadDirectoryCatalog();
       if (page === 'page-semantic')  refreshSemanticStats();
+      if (page === 'page-redis')     loadRedisKeys();
+      if (page === 'page-pubsub-locks') refreshPubSubAndLocks();
     });
   });
 
@@ -1844,7 +1846,327 @@ document.addEventListener('DOMContentLoaded', () => {
   initWebSocket();
   startPolling();
   setInterval(pollSimSnapshot, 1500);
+  setInterval(pollUiPubSubMessages, 2000);
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// REDIS ENGINE & EXPLORER (Phases 30, 31, 32)
+// ─────────────────────────────────────────────────────────────────────────
+let _cachedRedisKeys = [];
+
+async function loadRedisKeys() {
+  try {
+    const statsData = await API.get('/api/redis/stats');
+    if (statsData) {
+      document.getElementById('redis-stat-keys').textContent = statsData.total_keys ?? 0;
+      document.getElementById('redis-stat-hitrate').textContent = `${statsData.hit_rate_pct ?? 0}%`;
+      document.getElementById('redis-stat-hits-misses').textContent = `Hits: ${statsData.hits ?? 0} · Misses: ${statsData.misses ?? 0}`;
+      document.getElementById('redis-stat-policy').textContent = statsData.eviction_policy || 'noeviction';
+      document.getElementById('redis-stat-evictions').textContent = `Evicted: ${statsData.evicted_keys_total ?? 0} · Expired: ${statsData.expired_keys_total ?? 0}`;
+      document.getElementById('redis-stat-cmds').textContent = statsData.total_commands_executed ?? 0;
+
+      const tb = statsData.type_breakdown || {};
+      document.getElementById('redis-stat-types').textContent =
+        `Strings: ${tb.string ?? 0} | Hashes: ${tb.hash ?? 0} | Lists: ${tb.list ?? 0} | Sets: ${tb.set ?? 0} | ZSets: ${tb.zset ?? 0}`;
+
+      const policySelect = document.getElementById('redis-config-policy');
+      if (policySelect && statsData.eviction_policy) {
+        policySelect.value = statsData.eviction_policy;
+      }
+      const maxKeysInput = document.getElementById('redis-config-maxkeys');
+      if (maxKeysInput && statsData.max_keys_limit !== undefined) {
+        maxKeysInput.value = statsData.max_keys_limit || 0;
+      }
+    }
+
+    const keysData = await API.get('/api/redis/keys?pattern=*');
+    _cachedRedisKeys = keysData.keys || [];
+    renderRedisKeysTable(_cachedRedisKeys);
+  } catch (err) {
+    console.error("Failed to load Redis keys:", err);
+  }
+}
+
+function filterRedisKeysList() {
+  const query = (document.getElementById('redis-key-search')?.value || '').toLowerCase();
+  if (!query) {
+    renderRedisKeysTable(_cachedRedisKeys);
+    return;
+  }
+  const filtered = _cachedRedisKeys.filter(k => k.key.toLowerCase().includes(query) || k.type.toLowerCase().includes(query));
+  renderRedisKeysTable(filtered);
+}
+
+function renderRedisKeysTable(keys) {
+  const tbody = document.getElementById('redis-keys-table-body');
+  if (!tbody) return;
+
+  if (!keys || keys.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">No keys found in Redis store. Try running a SET command!</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = keys.map(k => {
+    let ttlDisplay = '<span class="text-muted">persistent</span>';
+    if (k.ttl >= 0) {
+      ttlDisplay = `<span class="badge badge-stale" style="font-size:10px;">${k.ttl}s</span>`;
+    }
+
+    let typeClass = 'badge-neutral';
+    if (k.type === 'string') typeClass = 'badge-ok';
+    if (k.type === 'hash')   typeClass = 'badge-quarantine';
+    if (k.type === 'list')   typeClass = 'badge-stale';
+    if (k.type === 'zset')   typeClass = 'badge-ok';
+
+    return `
+      <tr>
+        <td><strong style="cursor:pointer; color:var(--accent);" onclick="inspectRedisKey('${k.key}')">${k.key}</strong></td>
+        <td><span class="badge ${typeClass}" style="font-size:10px;">${k.type.toUpperCase()}</span></td>
+        <td>${k.size}</td>
+        <td>${ttlDisplay}</td>
+        <td>
+          <button class="btn btn-ghost btn-xs" onclick="inspectRedisKey('${k.key}')">Inspect</button>
+          <button class="btn btn-ghost btn-xs text-danger" onclick="deleteRedisKey('${k.key}')">&times;</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+async function inspectRedisKey(key) {
+  try {
+    const data = await API.get(`/api/redis/get/${encodeURIComponent(key)}`);
+    document.getElementById('redis-inspect-key-name').textContent = data.key;
+    document.getElementById('redis-inspect-type-badge').textContent = data.type.toUpperCase();
+    document.getElementById('redis-inspect-content').textContent = JSON.stringify(data.value, null, 2);
+  } catch (err) {
+    document.getElementById('redis-inspect-content').textContent = `// Error: ${err.message}`;
+  }
+}
+
+async function deleteRedisKey(key) {
+  if (!confirm(`Delete key '${key}'?`)) return;
+  try {
+    await API.del(`/api/redis/delete/${encodeURIComponent(key)}`);
+    loadRedisKeys();
+  } catch (err) {
+    alert(`Failed to delete key: ${err.message}`);
+  }
+}
+
+function setRedisPreset(cmd) {
+  const input = document.getElementById('redis-cli-input');
+  if (input) {
+    input.value = cmd;
+    input.focus();
+  }
+}
+
+async function executeRedisCliCommand() {
+  const input = document.getElementById('redis-cli-input');
+  const output = document.getElementById('redis-cli-output');
+  if (!input || !output) return;
+
+  const rawCmd = input.value.trim();
+  if (!rawCmd) return;
+
+  // Simple token parser supporting quotes
+  const regex = /[^\s"']+|"([^"]*)"|'([^']*)'/g;
+  const tokens = [];
+  let match;
+  while ((match = regex.exec(rawCmd)) !== null) {
+    tokens.push(match[1] || match[2] || match[0]);
+  }
+
+  if (tokens.length === 0) return;
+  const cmd = tokens[0];
+  const args = tokens.slice(1);
+
+  output.innerHTML += `<div style="color:#81A1C1;">&gt; ${rawCmd}</div>`;
+
+  try {
+    const res = await API.post('/api/redis/command', { cmd, args });
+    if (res.ok) {
+      const formatted = typeof res.result === 'object' ? JSON.stringify(res.result, null, 2) : res.result;
+      output.innerHTML += `<div style="color:#A3BE8C;">${formatted === null ? '(nil)' : formatted}</div>`;
+    } else {
+      output.innerHTML += `<div style="color:#BF616A;">(error) ${res.error || 'Unknown error'}</div>`;
+    }
+    input.value = '';
+    loadRedisKeys();
+  } catch (err) {
+    output.innerHTML += `<div style="color:#BF616A;">(error) ${err.message}</div>`;
+  }
+  output.scrollTop = output.scrollHeight;
+}
+
+async function saveRedisEvictionConfig() {
+  const maxKeys = parseInt(document.getElementById('redis-config-maxkeys')?.value || '0', 10);
+  const policy = document.getElementById('redis-config-policy')?.value || 'noeviction';
+  const statusEl = document.getElementById('redis-eviction-save-status');
+
+  try {
+    await API.post('/api/redis/config/eviction', { max_keys: maxKeys, policy: policy });
+    if (statusEl) {
+      statusEl.textContent = 'Saved successfully!';
+      statusEl.style.color = '#A3BE8C';
+      setTimeout(() => { statusEl.textContent = ''; }, 3000);
+    }
+    loadRedisKeys();
+  } catch (err) {
+    if (statusEl) {
+      statusEl.textContent = `Error: ${err.message}`;
+      statusEl.style.color = '#BF616A';
+    }
+  }
+}
+
+async function flushRedisDb() {
+  if (!confirm("Are you sure you want to flush all keys from Redis DB?")) return;
+  try {
+    await API.post('/api/redis/flush', {});
+    loadRedisKeys();
+  } catch (err) {
+    alert(`Flush failed: ${err.message}`);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// PUB/SUB & REDLOCK MUTEX STUDIO (Phase 32)
+// ─────────────────────────────────────────────────────────────────────────
+let _subscribedChannels = new Set(['system:*']);
+
+async function refreshPubSubAndLocks() {
+  try {
+    // 1. PubSub Stats
+    const psStats = await API.get('/api/redis/pubsub/stats');
+    if (psStats) {
+      document.getElementById('pubsub-active-subs-badge').textContent = `${psStats.active_subscribers} Subscribers · ${psStats.active_channels} Channels`;
+    }
+
+    // 2. Redlock Locks
+    const lockData = await API.get('/api/redis/lock/list');
+    const locks = lockData.locks || [];
+    document.getElementById('redlock-count-badge').textContent = `${locks.length} Active Locks`;
+
+    const tbody = document.getElementById('redlock-table-body');
+    if (tbody) {
+      if (locks.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">No active distributed locks.</td></tr>`;
+      } else {
+        tbody.innerHTML = locks.map(l => `
+          <tr>
+            <td><strong>${l.resource}</strong></td>
+            <td><code style="font-size:10px;">${l.owner_token.slice(0, 12)}...</code></td>
+            <td><span class="badge badge-stale" style="font-size:10px;">${l.remaining_ttl_ms}ms</span></td>
+            <td>
+              <button class="btn btn-ghost btn-xs text-danger" onclick="releaseUiLock('${l.resource}', '${l.owner_token}')">Release</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+  } catch (err) {
+    console.error("Failed to refresh PubSub and Locks:", err);
+  }
+}
+
+async function publishUiMessage() {
+  const chInput = document.getElementById('pubsub-channel-input');
+  const msgInput = document.getElementById('pubsub-msg-input');
+  if (!chInput || !msgInput) return;
+
+  const channel = chInput.value.trim();
+  const message = msgInput.value.trim();
+  if (!channel || !message) return;
+
+  try {
+    const res = await API.post('/api/redis/publish', { channel, message });
+    appendPubSubFeed(`[PUB -> ${channel}] (Delivered to ${res.receivers} receivers): ${message}`, '#88C0D0');
+    msgInput.value = '';
+    refreshPubSubAndLocks();
+  } catch (err) {
+    appendPubSubFeed(`[PUB ERROR] ${err.message}`, '#BF616A');
+  }
+}
+
+async function subscribeUiClient() {
+  const clientId = document.getElementById('pubsub-client-id')?.value.trim() || 'ui-browser-client';
+  const patternsRaw = document.getElementById('pubsub-sub-channels')?.value.trim() || 'system:*';
+  const patterns = patternsRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+  try {
+    await API.post('/api/redis/psubscribe', { subscriber_id: clientId, patterns: patterns });
+    appendPubSubFeed(`[SUB] Client '${clientId}' subscribed to: ${patterns.join(', ')}`, '#A3BE8C');
+    refreshPubSubAndLocks();
+  } catch (err) {
+    appendPubSubFeed(`[SUB ERROR] ${err.message}`, '#BF616A');
+  }
+}
+
+async function pollUiPubSubMessages() {
+  const clientId = document.getElementById('pubsub-client-id')?.value.trim() || 'ui-browser-client';
+  try {
+    const res = await API.get(`/api/redis/messages/${encodeURIComponent(clientId)}`);
+    if (res && res.messages && res.messages.length > 0) {
+      for (const msg of res.messages) {
+        appendPubSubFeed(`[RECV ${msg.channel}${msg.pattern ? ' via ' + msg.pattern : ''}]: ${msg.data}`, '#EBCB8B');
+      }
+    }
+  } catch (err) {
+    // Silent on poll error
+  }
+}
+
+function appendPubSubFeed(text, color = '#ECEFF4') {
+  const feed = document.getElementById('pubsub-feed-container');
+  if (!feed) return;
+  const timeStr = new Date().toLocaleTimeString();
+  feed.innerHTML += `<div style="color:${color}; margin-bottom:4px;"><span style="color:#4C566A; font-size:10px;">[${timeStr}]</span> ${text}</div>`;
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function clearPubSubFeed() {
+  const feed = document.getElementById('pubsub-feed-container');
+  if (feed) feed.innerHTML = '<div class="text-muted">// Feed cleared.</div>';
+}
+
+async function acquireUiLock() {
+  const resInput = document.getElementById('lock-resource-input');
+  const ttlInput = document.getElementById('lock-ttl-input');
+  const resultEl = document.getElementById('lock-acquire-result');
+  if (!resInput) return;
+
+  const resource = resInput.value.trim();
+  const ttlMs = parseInt(ttlInput?.value || '10000', 10);
+  if (!resource) return;
+
+  try {
+    const res = await API.post('/api/redis/lock/acquire', { resource, ttl_ms: ttlMs });
+    if (res.ok) {
+      if (resultEl) resultEl.innerHTML = `<span style="color:#A3BE8C;">Lock acquired! Token: <code>${res.owner_token}</code></span>`;
+      resInput.value = '';
+    } else {
+      if (resultEl) resultEl.innerHTML = `<span style="color:#BF616A;">Failed: ${res.error}</span>`;
+    }
+    refreshPubSubAndLocks();
+  } catch (err) {
+    if (resultEl) resultEl.innerHTML = `<span style="color:#BF616A;">Error: ${err.message}</span>`;
+  }
+}
+
+async function releaseUiLock(resource, ownerToken) {
+  try {
+    const res = await API.post('/api/redis/lock/release', { resource, owner_token: ownerToken });
+    if (res.ok) {
+      refreshPubSubAndLocks();
+    } else {
+      alert("Failed to release lock: invalid owner token or lock expired.");
+    }
+  } catch (err) {
+    alert(`Error releasing lock: ${err.message}`);
+  }
+}
 
 
 
