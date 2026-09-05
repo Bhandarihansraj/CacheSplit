@@ -1,7 +1,13 @@
 import json
 from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
-import asyncpg
+
+try:
+    import asyncpg
+    PoolType = asyncpg.Pool
+except ImportError:
+    asyncpg = None
+    PoolType = Any
 
 from .interface import CommitStore
 
@@ -19,7 +25,7 @@ class PostgresCommitStore(CommitStore):
     Postgres adapter for CommitStore using asyncpg for connection pooling.
     """
 
-    def __init__(self, pool: asyncpg.Pool):
+    def __init__(self, pool: PoolType):
         self.pool = pool
 
     async def write(self, commit: Commit) -> str:

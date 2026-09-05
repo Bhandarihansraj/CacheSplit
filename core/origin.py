@@ -63,6 +63,10 @@ class Origin:
         self._store[key] = record
         return record
 
+    def get_version(self, key: str) -> int:
+        rec = self._store.get(key)
+        return rec.version if rec else 0
+
     def current_versions(self) -> dict[str, int]:
         return {k: v.version for k, v in self._store.items()}
 

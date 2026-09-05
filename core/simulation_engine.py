@@ -79,9 +79,15 @@ async def run_full_scenario(config: dict) -> dict[str, Any]:
 
     # ── 4. Check for inconsistent reads before recovery ─────────────────────
     for node in nodes:
-        stale = node.stale_keys()
-        if stale:
-            log("INCONSISTENT_READ", f"{node.node_id} has {len(stale)} stale keys: {stale}", node=node.node_id)
+        # Inconsistent read if explicitly marked STALE OR if invalidation was dropped and version lags origin
+        inconsistent_keys = []
+        for k in keys:
+            entry = node.get(k)
+            origin_ver = origin.get_version(k)
+            if entry and (entry.state == "STALE" or entry.version < origin_ver):
+                inconsistent_keys.append(f"{k}(v{entry.version} vs origin:v{origin_ver})")
+        if inconsistent_keys:
+            log("INCONSISTENT_READ", f"{node.node_id} would serve stale data for {len(inconsistent_keys)} key(s): {', '.join(inconsistent_keys)}", node=node.node_id)
 
     # ── 5. Overlap: second update while recovery is still pending ───────────
     overlap_key = keys[0]
