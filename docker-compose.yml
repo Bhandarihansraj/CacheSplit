@@ -1,0 +1,107 @@
+# ==============================================================================
+# CacheSplit v4 — Docker Compose Multi-Node Cluster Orchestration
+# Starts primary cluster gateway and regional edge nodes anywhere in 1 command.
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ── Primary Gateway & Control Plane ──────────────────────────────────────────
+  cachesplit-master:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cachesplit:v4
+    container_name: cachesplit-master
+    restart: unless-stopped
+    ports:
+      - "8000:8000"     # Web Dashboard & REST/WebSocket APIs
+      - "6379:6379"     # Redis Compatibility Engine
+      - "4433:4433/udp" # QUIC Transport Mesh
+    environment:
+      - NODE_ID=master-control-plane
+      - REGION=Global
+      - TIER=main
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DB_PATH=/app/data/cachesplit.db
+      - REDIS_COMPAT_PORT=6379
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - cachesplit-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/dashboard/node-map"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cachesplit-network
+
+  # ── US-East Regional Node Emulator ──────────────────────────────────────────
+  cachesplit-node-us:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cachesplit:v4
+    container_name: cachesplit-node-us
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      - NODE_ID=us-east-1
+      - REGION=US-East
+      - TIER=main
+      - MASTER_URL=http://cachesplit-master:8000
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DB_PATH=/app/data/cachesplit_us.db
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - cachesplit-data-us:/app/data
+    depends_on:
+      cachesplit-master:
+        condition: service_healthy
+    networks:
+      - cachesplit-network
+
+  # ── EU-West Regional Node Emulator ──────────────────────────────────────────
+  cachesplit-node-eu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cachesplit:v4
+    container_name: cachesplit-node-eu
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    environment:
+      - NODE_ID=eu-west-1
+      - REGION=EU-West
+      - TIER=main
+      - MASTER_URL=http://cachesplit-master:8000
+      - PORT=8000
+      - HOST=0.0.0.0
+      - DB_PATH=/app/data/cachesplit_eu.db
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - cachesplit-data-eu:/app/data
+    depends_on:
+      cachesplit-master:
+        condition: service_healthy
+    networks:
+      - cachesplit-network
+
+# ── Storage Volumes ──────────────────────────────────────────────────────────
+volumes:
+  cachesplit-data:
+    driver: local
+  cachesplit-data-us:
+    driver: local
+  cachesplit-data-eu:
+    driver: local
+
+# ── Cluster Network ──────────────────────────────────────────────────────────
+networks:
+  cachesplit-network:
+    driver: bridge

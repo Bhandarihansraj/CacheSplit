@@ -1,0 +1,16 @@
+# ==============================================================================
+# CacheSplit v4 — Containerized Automated Test Runner
+# Runs full pytest test suite (170/170 tests) inside an isolated container.
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cachesplit-test-runner
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: ["pytest", "tests/", "-v", "--tb=short"]
